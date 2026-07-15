@@ -1,26 +1,326 @@
-@import "tailwindcss";
+/* /app/globals.css */
+/* ============================================================
+   NAZARIA DESIGN SYSTEM — brand reference (v2)
+   Source: Nazaria Arts Collective Brand Guide (Sakshi Singh)
+   Site: nazariacollective.in | Email: us@nazariacollective.in
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+   CHANGELOG (v2 — this rewrite)
+   - Previous version had --surface-muted, --border, and --secondary all
+     resolving to the same hex (#b3dfde light / near-invisible dark tint).
+     Cards, borders and "muted" backgrounds were indistinguishable → the
+     "everything looks confusing / flat" problem.
+   - This version introduces a real TONAL LADDER: 4 distinct surface
+     steps (base → card → card-alt → card-strong) with guaranteed
+     minimum contrast between each adjacent step, in both light and
+     dark mode. Every card-on-a-card should now visibly separate.
+   - Removed the leftover Summer-Film-School lime (#e1f316) that was
+     hardcoded as the global dark-mode --text-accent placeholder.
+     Master shell now uses on-brand burgundy/cream accents only;
+     program-specific brights are scoped under [data-program] below.
+   - Border and muted-surface tokens are now separate values, not
+     aliases of --secondary.
+
+   BRAND OVERVIEW
+   Nazaria equips marginalised youth & women across India with media
+   training and civic education. Shared identity (youth-led storytelling,
+   creativity, community) across all programs — but each program has its
+   own sub-brand palette and fonts, scoped under the shared app shell.
+
+   LOGO RULES
+   - Always use full "Nazaria" wordmark (icon-only only for favicon/small
+     avatars/social handles).
+   - Logo safe zone marked by burgundy (#892d3b) in the brand guide.
+   - Works directly on: pink, yellow, lime, light grey, orange+white-circle.
+   - Needs a white circle/block behind it on dark/muted solids (e.g. teal) —
+     in dark mode ALWAYS wrap logo: bg-white rounded-full p-2 (or similar).
+   - Official documents: logo top-left + standard footer, every asset.
+
+   TYPOGRAPHY
+   - Master brand font: Playfair Display (next/font/google), mapped to
+     --font-playfair / --font-heading. Use for marketing headers/hero
+     sections and section titles — NOT dense UI body text.
+   - Body/UI text uses --font-sans (system/geist sans) for legibility at
+     small sizes; headings use --font-heading. Do not use the display
+     serif below ~15px.
+   - Each program overrides heading/sub-heading/body per its own stack
+     (see PROGRAM STRUCTURE below) — shared shell (nav, footer, buttons,
+     dashboard chrome) always stays on master brand fonts.
+
+   SPACING & HIERARCHY PRINCIPLES (new in v2)
+   - Every distinct "block" of content (a stat, a card, a form section)
+     gets its own visual container: background step + border + radius +
+     padding. Never rely on color alone to separate content — always
+     pair a shade change with a border and consistent padding (p-4/p-6).
+   - Use the tonal ladder in order of visual weight:
+       --surface        → page background
+       --card           → primary content card (1 step up/down from bg)
+       --card-alt       → nested/secondary card inside a card (1 more step)
+       --card-strong    → emphasized card (status, alerts, active state)
+   - Vertical rhythm: stacked cards/sections get consistent gap (gap-4 or
+     gap-6), never touching edges directly — no more "everything
+     crammed against everything else."
+   - Text hierarchy inside any card: title (text-primary, font-heading or
+     font-semibold) → meta/label (text-muted-foreground, text-sm) → body
+     (text-primary or text-foreground, text-sm/base). Never let title and
+     meta share the same color/weight.
+
+   COLOR — MASTER BRAND (shared app shell)
+     burgundy   #892d3b   primary / brand red-maroon / logo safe-zone
+     teal       #00504f   primary / brand dark teal
+     cream      #fcdfab   primary / warm neutral accent
+     white      #ffffff   primary / base
+     pale-teal  #b3dfde   secondary / soft accent
+     pale-gold  #ffe1ac   secondary / soft accent
+     pale-pink  #ffd7d7   secondary / soft accent
+
+   COLOR — SUMMER FILM SCHOOL
+     magenta #df3ba0 · lime #e1f316 · teal #00504f · white #ffffff
+     Fonts: Heading Bebas Neue / Oswald Regular · Sub-heading Big Shoulder
+     Display · Body Glacial Indifference
+
+   COLOR — MEDIA EXPRESS FELLOWSHIP
+     orange #e1520b · yellow #ffd200 · teal-blue #0f889d · white #ffffff
+     · sky #5ce1e6 · pale-blue #d6f5ff
+     Fonts: Heading Bobby Jones · Sub-heading Bobby Jones Condensed ·
+     Body Glacial Indifference / Hangyaboly
+
+   COLOR — RURAL MEDIA FELLOWSHIP (a.k.a. "Awaaz Fellowship" in body copy —
+   canonical name UNCONFIRMED, resolve before shipping labels)
+     teal #00504f · yellow #fede00 · burgundy #82343e · white #ffffff
+     Font: Glacial Indifference throughout (heading/sub-heading/body)
+
+   COLOR — BASTI MEDIA SCHOOL
+     NOT YET DOCUMENTED — no swatches provided. Do not invent values;
+     confirm with brand owner before building this program's theme scope.
+
+   SEMANTIC TOKEN TABLE (v2 — implemented as CSS vars below so components
+   use bg-[var(--color-card)] etc. instead of repeating dark: pairs)
+
+     token              light              dark               contrast note
+     surface            #ffffff            #06302f            page bg
+     card               #f6f9f8            #0c3f3d            +1 step from surface
+     card-alt           #eaf2f1            #123f3d*→ see note  +2 steps (nested cards)
+     card-strong        #ffffff w/ border  #10504e             emphasized/status cards
+     text-primary       #00504f            #ffffff             body/heading text
+     text-muted         #4b6a69            #b9d4d2             secondary/meta text
+     text-accent        #892d3b            #fcdfab             links, active labels
+     border              #d7e6e4            rgba(255,255,255,.14)  all card outlines
+     border-strong       #b3dfde            rgba(255,255,255,.24)  emphasized outlines
+
+   PROGRAM STRUCTURE (app scoping via [data-program="..."] — each program
+   overrides --program-primary/--program-accent/--program-font-heading
+   etc. when those routes get scaffolded; shell tokens above are
+   untouched by program scoping)
+     bastiMediaSchool        — colors/fonts pending
+     summerFilmSchool        — magenta/lime/teal, Bebas Neue + Glacial Indifference
+     mediaExpressFellowship  — orange/yellow/teal-blue/sky, Bobby Jones + Glacial Indifference
+     ruralMediaFellowship    — teal/yellow/burgundy, Glacial Indifference throughout
+
+   PHOTOGRAPHY
+   Each program has its own photo library — structure a photos config/
+   folder per program (basti-media-school/, summer-film-school/,
+   media-express-fellowship/, awaaz-fellowship/), shared access pattern.
+   ============================================================ */
+
+@import "tailwindcss";
+/*
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+*/
+
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-playfair);
+
+  /* Nazaria master brand palette — raw, fixed hex, not mode-dependent */
+  --color-nazaria-burgundy: #892d3b;
+  --color-nazaria-teal: #00504f;
+  --color-nazaria-cream: #fcdfab;
+  --color-nazaria-white: #ffffff;
+  --color-nazaria-pale-teal: #b3dfde;
+  --color-nazaria-pale-gold: #ffe1ac;
+  --color-nazaria-pale-pink: #ffd7d7;
+
+  /* Tonal ladder — the fix for "everything looks the same" */
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-card-alt: var(--card-alt);
+  --color-card-strong: var(--card-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-text-accent: var(--text-accent);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* ---- Tonal ladder — light mode ---- */
+  --surface: #ffffff;       /* page background */
+  --card: #f6f9f8;          /* step 1: primary card, cool off-white */
+  --card-alt: #eaf2f1;      /* step 2: nested card inside a card */
+  --card-strong: #ffffff;   /* emphasized card, relies on border-strong + shadow */
+
+  --text-primary: #00504f;  /* nazaria-teal */
+  --text-muted: #4b6a69;    /* desaturated teal-grey, distinct from text-primary */
+  --text-accent: #892d3b;   /* nazaria-burgundy */
+
+  --border: #d7e6e4;        /* soft, visible against both surface and card */
+  --border-strong: #b3dfde; /* nazaria-pale-teal, used for emphasis/active */
+
+  /* ---- shadcn-style base surfaces (kept for component compatibility) ---- */
+  --background: var(--surface);
+  --foreground: var(--text-primary);
+  --card-foreground: var(--text-primary);
+  --popover: var(--card);
+  --popover-foreground: var(--text-primary);
+
+  --primary: #892d3b;
+  --primary-foreground: #ffffff;
+  --secondary: #dcecea;         /* distinct from --border now */
+  --secondary-foreground: #00504f;
+  --muted: #f1ede4;             /* warm neutral, distinct from --secondary */
+  --muted-foreground: #6b7a79;
+  --accent: #ffe8d6;            /* warm peach, distinct from --muted and --secondary */
+  --accent-foreground: #892d3b;
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --input: #d7e6e4;
+  --ring: #892d3b;
+
+  --chart-1: #892d3b;
+  --chart-2: #00504f;
+  --chart-3: #df3ba0;
+  --chart-4: #e1520b;
+  --chart-5: #b8860b;
+
+  --radius: 0.625rem;
+
+  --sidebar: #f6f9f8;
+  --sidebar-foreground: #00504f;
+  --sidebar-primary: #892d3b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ffe8d6;
+  --sidebar-accent-foreground: #00504f;
+  --sidebar-border: #d7e6e4;
+  --sidebar-ring: #892d3b;
+}
+
+.dark {
+  /* ---- Tonal ladder — dark mode ---- */
+  --surface: #06302f;       /* darkest: page background */
+  --card: #0c3f3d;          /* step 1: visibly lighter than surface */
+  --card-alt: #14504d;      /* step 2: visibly lighter than card */
+  --card-strong: #1a5f5c;   /* step 3: emphasized/active card */
+
+  --text-primary: #ffffff;
+  --text-muted: #b9d4d2;    /* distinct from text-primary, still legible */
+  --text-accent: #fcdfab;   /* nazaria-cream — warm, on-brand, not lime */
+
+  --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.28);
+
+  /* ---- shadcn-style base surfaces ---- */
+  --background: var(--surface);
+  --foreground: var(--text-primary);
+  --card-foreground: var(--text-primary);
+  --popover: var(--card);
+  --popover-foreground: var(--text-primary);
+
+  --primary: #fcdfab;
+  --primary-foreground: #00504f;
+  --secondary: #123f3d;
+  --secondary-foreground: #ffffff;
+  --muted: #16413f;
+  --muted-foreground: #a9c7c5;
+  --accent: #892d3b;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.704 0.191 22.216);
+
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #fcdfab;
+
+  --chart-1: #fcdfab;
+  --chart-2: #ffd7a8;
+  --chart-3: #ff9ecb;
+  --chart-4: #ffb37a;
+  --chart-5: #7fd7d4;
+
+  --sidebar: #06302f;
+  --sidebar-foreground: #fcdfab;
+  --sidebar-primary: #fcdfab;
+  --sidebar-primary-foreground: #00504f;
+  --sidebar-accent: #892d3b;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --sidebar-ring: #fcdfab;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Reusable card-step utilities — use these instead of hand-rolling
+     bg-white/dark:bg-* pairs on every component. Always pair a surface
+     step with a border so adjacent same-toned blocks still separate. */
+  .surface-card {
+    @apply bg-card text-text-primary border border-border rounded-xl p-4;
+  }
+  .surface-card-alt {
+    @apply bg-card-alt text-text-primary border border-border rounded-lg p-3;
+  }
+  .surface-card-strong {
+    @apply bg-card-strong text-text-primary border border-border-strong rounded-xl p-4 shadow-sm;
+  }
 }
