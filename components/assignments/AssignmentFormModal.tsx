@@ -15,10 +15,8 @@ export interface AssignmentFormModalProps {
   open: boolean;
   onClose: () => void;
   mode: "create" | "edit";
-  /** Required when mode === "edit" — the modal fetches the full assignment + roster itself. */
   assignmentId?: string;
   currentUserId: string;
-  /** Pass the acting mentor's own id to scope the roster step to their own pods; omit for PM/associate. */
   scopeToMentorId?: string;
   onSaved: () => void;
 }
@@ -38,9 +36,6 @@ export function AssignmentFormModal({
   const [workingAssignment, setWorkingAssignment] = React.useState<AssignmentWithSlots | null>(null);
   const [selectedMenteeIds, setSelectedMenteeIds] = React.useState<string[]>([]);
   const [dueAt, setDueAt] = React.useState("");
-  // Tracks removals confirmed mid-session so a remove-then-re-add of the
-  // same mentee before hitting "Done" is treated as a fresh add, not
-  // silently skipped because the stale committed-ids fetch still lists them.
   const [locallyRemovedIds, setLocallyRemovedIds] = React.useState<Set<string>>(new Set());
 
   const { data: existingAssignment, isLoading: loadingAssignment } = useQuery({
@@ -49,17 +44,24 @@ export function AssignmentFormModal({
     enabled: open && mode === "edit" && !!assignmentId,
   });
 
+  // Track if we have already loaded the initial roster into our local state
+  const isInitialized = React.useRef(false);
+
   const { data: assignedRefs, isLoading: loadingRoster } = useQuery({
     queryKey: ["assigned-mentee-refs", assignmentId],
     queryFn: () => fetchAssignedMenteeRefs(assignmentId!),
     enabled: open && mode === "edit" && !!assignmentId && step === "roster",
+    // We can safely seed state here as soon as data arrives successfully
+    select: (data) => {
+      if (!isInitialized.current && mode === "edit") {
+        setSelectedMenteeIds(data.map((r) => r.menteeId));
+        isInitialized.current = true;
+      }
+      return data;
+    }
   });
 
-  React.useEffect(() => {
-    if (mode === "edit" && assignedRefs) {
-      setSelectedMenteeIds(assignedRefs.map((r) => r.menteeId));
-    }
-  }, [mode, assignedRefs]);
+  // --- REMOVED THE USEEFFECT THAT WAS CAUSING THE ERROR ---
 
   const committedIds = React.useMemo(() => (assignedRefs ?? []).map((r) => r.menteeId), [assignedRefs]);
   const effectiveCommittedIds = React.useMemo(
@@ -106,6 +108,7 @@ export function AssignmentFormModal({
     setSelectedMenteeIds([]);
     setDueAt("");
     setLocallyRemovedIds(new Set());
+    isInitialized.current = false; // Reset initialization tracking flag
   }
 
   function handleClose() {
