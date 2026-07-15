@@ -3,7 +3,7 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
@@ -11,9 +11,9 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { CollapsibleSection } from "@/components/shared/CollapsibleSection";
-import { CreateAssignmentModal } from "@/components/assignments/CreateAssignmentModal";
+import { AssignmentFormModal } from "@/components/assignments/AssignmentFormModal";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { fetchAssignments } from "@/lib/api/assignments";
+import { fetchAssignments, softDeleteAssignment } from "@/lib/api/assignments";
 import type { Assignment } from "@/types/assignments";
 
 type AssignmentLifecycle = "ongoing" | "upcoming" | "ended";
@@ -36,31 +36,42 @@ function matchesSearch(a: Assignment, term: string): boolean {
   return a.title.toLowerCase().includes(needle) || a.description.toLowerCase().includes(needle);
 }
 
+interface FormModalState {
+  mode: "create" | "edit";
+  assignmentId?: string;
+}
+
 export default function AssignmentsListPage() {
-  const { permissionLevel } = useRole();
+  const { role, permissionLevel } = useRole();
   const userId = useSessionStore((s) => s.userId);
+  const queryClient = useQueryClient();
 
   const [globalSearch, setGlobalSearch] = React.useState("");
   const [ongoingSearch, setOngoingSearch] = React.useState("");
   const [upcomingSearch, setUpcomingSearch] = React.useState("");
   const [endedSearch, setEndedSearch] = React.useState("");
-  const [createOpen, setCreateOpen] = React.useState(false);
+  const [formModal, setFormModal] = React.useState<FormModalState | null>(null);
 
   const { data: assignments, isLoading, refetch } = useQuery({
     queryKey: ["assignments", "list"],
     queryFn: () => fetchAssignments(),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => softDeleteAssignment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignments", "list"] });
+    },
+  });
+
   const today = new Date().toISOString().slice(0, 10);
   const isMentee = permissionLevel === "mentee";
   const canCreate = permissionLevel === "mentor" || permissionLevel === "staff";
+  const scopeToMentorId = role === "mentor" ? userId ?? undefined : undefined;
 
   const globallyFiltered = (assignments ?? []).filter((a) => matchesSearch(a, globalSearch));
 
   if (isMentee) {
-    // Mentees only see what's currently relevant: ongoing assignments, plus
-    // anything that ended within the last week. Upcoming assignments and
-    // anything that ended more than a week ago are hidden entirely.
     const visible = globallyFiltered.filter((a) => {
       const lifecycle = lifecycleOf(a, today);
       if (lifecycle === "upcoming") return false;
@@ -72,7 +83,6 @@ export default function AssignmentsListPage() {
       <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Assignments">
         <div className="flex flex-col gap-4 p-4">
           <SearchInput value={globalSearch} onChange={setGlobalSearch} placeholder="Search assignments…" />
-
           {isLoading ? (
             <div className="text-sm text-text-primary/50">Loading…</div>
           ) : visible.length === 0 ? (
@@ -93,20 +103,34 @@ export default function AssignmentsListPage() {
   const upcoming = globallyFiltered.filter((a) => lifecycleOf(a, today) === "upcoming" && matchesSearch(a, upcomingSearch));
   const ended = globallyFiltered.filter((a) => lifecycleOf(a, today) === "ended" && matchesSearch(a, endedSearch));
 
+  function renderManagedGrid(list: Assignment[], emptyLabel: string) {
+    if (list.length === 0) {
+      return <p className="px-1 text-xs text-text-primary/50">{emptyLabel}</p>;
+    }
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {list.map((a) => (
+          <AssignmentCard
+            key={a.id}
+            assignment={a}
+            href={`/assignments/${a.id}`}
+            onEdit={() => setFormModal({ mode: "edit", assignmentId: a.id })}
+            onDelete={() => deleteMutation.mutateAsync(a.id)}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Assignments">
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SearchInput
-            value={globalSearch}
-            onChange={setGlobalSearch}
-            placeholder="Search all assignments…"
-            className="sm:max-w-sm"
-          />
+          <SearchInput value={globalSearch} onChange={setGlobalSearch} placeholder="Search all assignments…" className="sm:max-w-sm" />
           {canCreate && (
             <button
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={() => setFormModal({ mode: "create" })}
               className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               <Plus className="h-4 w-4" />
@@ -121,53 +145,41 @@ export default function AssignmentsListPage() {
           <div className="flex flex-col gap-4">
             <CollapsibleSection title="Ongoing" count={ongoing.length} accentClassName="bg-primary" defaultOpen>
               <SearchInput value={ongoingSearch} onChange={setOngoingSearch} placeholder="Search ongoing…" />
-              <AssignmentGridOrEmpty assignments={ongoing} emptyLabel="No ongoing assignments." />
+              {renderManagedGrid(ongoing, "No ongoing assignments.")}
             </CollapsibleSection>
 
             <CollapsibleSection title="Upcoming" count={upcoming.length} accentClassName="bg-text-primary/40" defaultOpen={false}>
               <SearchInput value={upcomingSearch} onChange={setUpcomingSearch} placeholder="Search upcoming…" />
-              <AssignmentGridOrEmpty assignments={upcoming} emptyLabel="No upcoming assignments." />
+              {renderManagedGrid(upcoming, "No upcoming assignments.")}
             </CollapsibleSection>
 
             <CollapsibleSection title="Ended" count={ended.length} accentClassName="bg-secondary-foreground/40" defaultOpen={false}>
               <SearchInput value={endedSearch} onChange={setEndedSearch} placeholder="Search ended…" />
-              <AssignmentGridOrEmpty assignments={ended} emptyLabel="No ended assignments." />
+              {renderManagedGrid(ended, "No ended assignments.")}
             </CollapsibleSection>
           </div>
         )}
       </div>
 
-      {canCreate && userId && (
-        <CreateAssignmentModal open={createOpen} onClose={() => setCreateOpen(false)} createdBy={userId} onCreated={() => refetch()} />
+      {canCreate && userId && formModal && (
+        <AssignmentFormModal
+          open={!!formModal}
+          onClose={() => setFormModal(null)}
+          mode={formModal.mode}
+          assignmentId={formModal.assignmentId}
+          currentUserId={userId}
+          scopeToMentorId={scopeToMentorId}
+          onSaved={() => {
+            setFormModal(null);
+            refetch();
+          }}
+        />
       )}
     </AppShell>
   );
 }
 
-function AssignmentGridOrEmpty({ assignments, emptyLabel }: { assignments: Assignment[]; emptyLabel: string }) {
-  if (assignments.length === 0) {
-    return <p className="px-1 text-xs text-text-primary/50">{emptyLabel}</p>;
-  }
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {assignments.map((a) => (
-        <AssignmentCard key={a.id} assignment={a} href={`/assignments/${a.id}`} />
-      ))}
-    </div>
-  );
-}
-
-function SearchInput({
-  value,
-  onChange,
-  placeholder,
-  className,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  className?: string;
-}) {
+function SearchInput({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
   return (
     <div className={cnLocal("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-primary/40" />

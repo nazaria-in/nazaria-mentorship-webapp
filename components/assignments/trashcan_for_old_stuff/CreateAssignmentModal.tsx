@@ -71,7 +71,7 @@ export function CreateAssignmentModal({ open, onClose, createdBy, onCreated }: C
       title={step === "details" ? "Create assignment" : "Assign to mentees"}
       description={
         step === "details"
-          ? "Set up the assignment template and its submission slots."
+          ? "Set up the assignment and its submission slots."
           : "Choose which mentees should receive this assignment, and by when it's due for them."
       }
       className="max-w-xl"

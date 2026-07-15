@@ -10,6 +10,7 @@ import { useSessionStore } from "@/store/session-store";
 import { fetchAssignments } from "@/lib/api/assignments";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { redirect } from "next/navigation";
 
 export default function DashboardPage() {
   const { permissionLevel } = useRole();
@@ -18,6 +19,15 @@ export default function DashboardPage() {
     queryKey: ["assignments", "dashboard"],
     queryFn: () => fetchAssignments({ isActive: true }),
   });
+
+
+
+  //until a better dashboard page is made
+  let redriect_to_assiments: boolean = false;
+  redriect_to_assiments = true
+  if (redriect_to_assiments){
+    return redirect("/assignments")
+  }
 
   return (
     <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Dashboard">

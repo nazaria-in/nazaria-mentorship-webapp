@@ -25,12 +25,11 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
   const [endDate, setEndDate] = React.useState(initialValues?.end_date ?? "");
   const [slots, setSlots] = React.useState<DraftSlot[]>(
     initialValues?.slots.map((s) => ({ id: s.id, title: s.title, max_versions: s.max_versions })) ?? [
-      { id: crypto.randomUUID(), title: "File Title", max_versions: 4 },
+      { id: crypto.randomUUID(), title: "Submission Title", max_versions: 4 },
     ]
   );
 
-  // Editing is locked once the assignment has already started — the schema
-  // has no `locks_at`, so this is purely an app-level rule against start_date.
+  // Lock editing if the assignment has already started
   const hasStarted = mode === "edit" && !!initialValues && initialValues.start_date <= new Date().toISOString().slice(0, 10);
 
   const mutation = useMutation({
@@ -65,20 +64,21 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-5 p-1"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSubmit) mutation.mutate();
       }}
     >
       {hasStarted && (
-        <div className="rounded-xl border border-border bg-surface-muted px-3 py-2 text-xs text-text-primary/70">
-          This assignment has started and its dates/slots can no longer be edited.
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground font-medium backdrop-blur-sm">
+          This assignment has started. The timeline schedules and template slots cannot be modified.
         </div>
       )}
 
       <Field label="Title">
         <input
+          type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={hasStarted}
@@ -94,6 +94,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           disabled={hasStarted}
           rows={2}
           className={inputClass}
+          placeholder="Provide a short overview summary..."
         />
       </Field>
 
@@ -104,10 +105,11 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           disabled={hasStarted}
           rows={3}
           className={inputClass}
+          placeholder="Detailed submission pipeline guide, criteria requirements..."
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <Field label="Start date">
           <input
             type="date"
@@ -135,46 +137,53 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           onChange={(e) => setWeekNumber(e.target.value)}
           disabled={hasStarted}
           className={inputClass}
+          placeholder="e.g. 3"
         />
       </Field>
 
-      <div>
-        <p className="mb-2 text-xs font-medium text-text-primary/70">Submission slots</p>
-        <SubmissionSlotEditor slots={slots} onChange={setSlots} disabled={hasStarted} />
+      <div className="space-y-2 mt-2">
+        <p className="text-xs font-semibold tracking-wide uppercase text-text-primary/80">Submission slots</p>
+        <div className={hasStarted ? "opacity-65 pointer-events-none" : ""}>
+          <SubmissionSlotEditor slots={slots} onChange={setSlots} disabled={hasStarted} />
+        </div>
       </div>
 
-      {mutation.isError && <p className="text-xs text-destructive">Couldn`t save. Try again.</p>}
+      {mutation.isError && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium">
+          Failed to commit updates. Please verify entries and retry.
+        </div>
+      )}
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={!canSubmit || mutation.isPending || hasStarted}
-          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {mutation.isPending ? "Saving…" : mode === "create" ? "Create assignment" : "Save changes"}
-        </button>
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40 mt-2">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-surface-muted"
+            className="rounded-xl border border-border/80 bg-surface px-5 py-2.5 text-sm font-medium text-text-primary transition hover:bg-surface-muted hover:border-border focus:outline-none focus:ring-2 focus:ring-border/40"
           >
             Cancel
           </button>
         )}
+        <button
+          type="submit"
+          disabled={!canSubmit || mutation.isPending || hasStarted}
+          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-95 disabled:bg-muted disabled:text-text-primary/40 disabled:border-transparent disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          {mutation.isPending ? "Saving changes..." : mode === "create" ? "Create assignment" : "Save changes"}
+        </button>
       </div>
     </form>
   );
 }
 
 const inputClass =
-  "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-primary/40 focus:outline-none disabled:opacity-50 dark:bg-white/5";
+  "w-full rounded-xl border border-border/80 bg-background/50 px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-primary/40 backdrop-blur-xs transition focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:bg-muted/30 disabled:text-text-primary/50 disabled:cursor-not-allowed dark:bg-white/5 dark:border-white/10 dark:focus:border-primary";
 
 function Field({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-text-primary/70">
-        {label} {optional && <span className="text-text-primary/40">(optional)</span>}
+    <label className="flex flex-col gap-1.5 w-full">
+      <span className="text-xs font-semibold tracking-wide uppercase text-text-primary/80">
+        {label} {optional && <span className="text-text-primary/40 lowercase normal-case font-normal">(optional)</span>}
       </span>
       {children}
     </label>

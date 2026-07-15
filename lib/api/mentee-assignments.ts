@@ -212,3 +212,42 @@ export async function dispatchAssignment(input: {
   if (error) throw error;
   return (data ?? []) as MenteeAssignment[];
 }
+
+
+export interface AssignedMenteeRef {
+  menteeAssignmentId: string;
+  menteeId: string;
+}
+
+interface AssignedMenteeRow {
+  id: string;
+  mentee_id: string;
+}
+
+// Lightweight lookup for the edit-roster step — seeds PodMemberSelector's
+// committed ids and resolves mentee_id -> the actual mentee_assignments row
+// id that removeMenteeAssignment below needs.
+export async function fetchAssignedMenteeRefs(assignmentId: string): Promise<AssignedMenteeRef[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("mentee_assignments")
+    .select("id, mentee_id")
+    .eq("assignment_id", assignmentId);
+  if (error) throw error;
+  const typed = (data ?? []) as AssignedMenteeRow[];
+  return typed.map((d) => ({ menteeAssignmentId: d.id, menteeId: d.mentee_id }));
+}
+
+// Hard delete — mentee_assignments has no deleted_at column, so there's no
+// soft-delete option here. FLAGGED GAP: mentee_submissions.mentee_assignment_id
+// is a FK into this table, and the schema dump doesn't show that FK's ON
+// DELETE behavior. If it's RESTRICT/NO ACTION (Postgres default), this
+// throws when the mentee already has submissions attached — the caller
+// needs to surface that error, not swallow it. If it's CASCADE, their
+// submissions vanish silently along with the row. Confirm which one your
+// migration set before trusting this in production.
+export async function removeMenteeAssignment(menteeAssignmentId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("mentee_assignments").delete().eq("id", menteeAssignmentId);
+  if (error) throw error;
+}
