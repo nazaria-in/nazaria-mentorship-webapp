@@ -93,8 +93,12 @@ export type FilterFieldDef =
       /** Escape hatch only — prefer backing a SQL view and using `enum`/
        *  `boolean` against that view instead of reaching for this. Typed
        *  as unknown[] since the row shape varies per call site — cast
-       *  inside your resolver, e.g. `(rows as MyRow[]).filter(...)`. */
-      resolver: (rows: unknown[], selected: string[]) => unknown[];
+       *  inside your resolver, e.g. `(rows as MyRow[]).filter(...)`.
+       *  `selected` = chips clicked to include, `excluded` = chips
+       *  clicked to exclude (2nd click). Resolver owns how a row's
+       *  underlying status maps to option values — return true if the
+       *  row's status is NOT in `excluded` when excluded is non-empty. */
+      resolver: (rows: unknown[], selected: string[], excluded: string[]) => unknown[];
     };
 
 export type FilterValue = ChipState | boolean | string | DateRangeValue | NumberRangeValue | Record<string, ChipState>;

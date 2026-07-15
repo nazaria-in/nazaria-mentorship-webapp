@@ -122,7 +122,10 @@ export function applyComputedFilters<T>(rows: T[], fieldDefs: FilterFieldDef[], 
     const value = filterState.values[field.key] as Record<string, ChipState> | undefined;
     if (!value) continue;
     const selected = Object.entries(value).filter(([, s]) => s === "selected").map(([v]) => v);
-    if (selected.length > 0) result = field.resolver(result, selected) as T[];
+    const excluded = Object.entries(value).filter(([, s]) => s === "anti-selected").map(([v]) => v);
+    if (selected.length > 0 || excluded.length > 0) {
+      result = field.resolver(result, selected, excluded) as T[];
+    }
   }
   return result;
 }

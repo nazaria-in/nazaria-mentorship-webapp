@@ -87,14 +87,10 @@ interface SubmissionRow {
 }
 
 export async function fetchMenteeAssignmentSummaries(
-  assignmentId: string,
-  filters: { podId?: string; onlyUnreviewed?: boolean } = {}
+  assignmentId: string
 ): Promise<MenteeAssignmentSummary[]> {
   const supabase = createClient();
 
-  // NOTE: full_name only — bio is a profile field, not a display name, and
-  // was previously used as a fallback here, which is why mentee cards were
-  // showing bio text instead of the mentee's actual name.
   const { data: dispatches, error: dispatchError } = await supabase
     .from("mentee_assignments")
     .select("id, mentee_id, due_at, is_completed, mentee:users!mentee_assignments_mentee_id_fkey(id, full_name)")
@@ -119,10 +115,9 @@ export async function fetchMenteeAssignmentSummaries(
   if (subsError) throw subsError;
   const typedSubmissions = (submissions ?? []) as SubmissionRow[];
 
-  let summaries: MenteeAssignmentSummary[] = typedDispatches.map((d) => {
+  const summaries: MenteeAssignmentSummary[] = typedDispatches.map((d) => {
     const rows = typedSubmissions.filter((s) => s.mentee_assignment_id === d.id);
     const submittedSlotIds = new Set(rows.map((r) => r.slot_id));
-    // latest version per slot determines that slot's current review state
     const latestBySlot = new Map<string, { status: SubmissionStatus; version_number: number }>();
     for (const r of rows) {
       const existing = latestBySlot.get(r.slot_id);
@@ -144,11 +139,10 @@ export async function fetchMenteeAssignmentSummaries(
     };
   });
 
-  if (filters.onlyUnreviewed) summaries = summaries.filter((s) => s.pendingReviewCount > 0);
-  // filters.podId requires a pod_members join — apply once that hook/join is wired up.
-
+  // podId filtering requires a pod_members join — apply once that hook/join is wired up.
   return summaries;
 }
+
 
 // ---- Mentee actions ----
 
