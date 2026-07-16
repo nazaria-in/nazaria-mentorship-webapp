@@ -8,39 +8,138 @@ import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import { fetchAssignments } from "@/lib/api/assignments";
+import { fetchMeetingsInRange } from "@/lib/api/meetings";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { redirect } from "next/navigation";
+import { TimelineElement } from "@/components/shared/TimelineElement";
+import { useState, useMemo } from "react";
+import { TimelineElementDetailsModal } from "@/components/shared/TimelineElementDetailsModal";
+import type { Assignment } from "@/types/assignments";
+import type { MeetingWithParticipants } from "@/types/meetings";
+
+interface SelectedItemState {
+  title: string;
+  description: string;
+}
 
 export default function DashboardPage() {
-  const { permissionLevel } = useRole();
+  const { permissionLevel, role } = useRole();
+  const userId = useSessionStore((s) => s.userId);
+  const [selectedItem, setSelectedItem] = useState<SelectedItemState | null>(null);
 
-  const { data: assignments, isLoading } = useQuery({
+  // Compute a valid week boundary window for our API range rules
+  const { rangeStart, rangeEnd } = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setDate(end.getDate() + 7);
+    end.setHours(23, 59, 59, 999);
+    return {
+      rangeStart: start.toISOString(),
+      rangeEnd: end.toISOString(),
+    };
+  }, []);
+
+  // Fetch active assignments safely with typed dataset
+  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["assignments", "dashboard"],
     queryFn: () => fetchAssignments({ isActive: true }),
   });
 
-
-
-  //until a better dashboard page is made
-  let redriect_to_assiments: boolean = false;
-  redriect_to_assiments = true
-  if (redriect_to_assiments){
-    return redirect("/assignments")
-  }
+  // Fetch upcoming meetings using the existing range function setup
+  const { data: meetings, isLoading: meetingsLoading } = useQuery<MeetingWithParticipants[]>({
+    queryKey: ["meetings", "dashboard", userId, role, rangeStart, rangeEnd],
+    queryFn: () => fetchMeetingsInRange({ userId, role, rangeStart, rangeEnd }),
+    enabled: !!userId,
+  });
 
   return (
     <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Dashboard">
-      <div className="flex flex-col gap-5 p-4">
+      <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">
         <DashboardGreeting />
 
+        {/* Dual-Track Timeline Summary Grid */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Meetings Track Column */}
+          <div className="lg:col-span-2 space-y-3">
+            <h2 className="font-heading text-sm font-semibold text-text-primary">
+              Upcoming Live Sessions
+            </h2>
+            
+            {meetingsLoading ? (
+              <div className="text-sm text-text-primary/50">Loading timeline...</div>
+            ) : !meetings || meetings.length === 0 ? (
+              <div className="border border-dashed border-border p-4 rounded-xl text-center text-xs text-text-muted">
+                No meetings scheduled for this week.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {meetings.slice(0, 5).map((meeting) => {
+                  const durationMs = new Date(meeting.ends_at).getTime() - new Date(meeting.starts_at).getTime();
+                  const durationMinutes = durationMs / (1000 * 60);
+                  const timeString = new Date(meeting.starts_at).toLocaleTimeString([], { 
+                    hour: "numeric", 
+                    minute: "2-digit" 
+                  });
+
+                  return (
+                    <TimelineElement
+                      key={meeting.id}
+                      variant="meeting"
+                      title={meeting.title}
+                      timeLabel={`${timeString} (${durationMinutes} mins)`}
+                      durationVariant={durationMinutes <= 30 ? "short" : "standard"}
+                      onShowDetails={() => setSelectedItem({ 
+                        title: meeting.title, 
+                        description: meeting.description || "No description provided." 
+                      })}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Active Horizons Tracker Column */}
+          <div className="space-y-3">
+            <h2 className="font-heading text-sm font-semibold text-text-primary">
+              Active Horizons & Deadlines
+            </h2>
+            
+            {assignmentsLoading ? (
+              <div className="text-sm text-text-primary/50">Loading horizons...</div>
+            ) : !assignments || assignments.length === 0 ? (
+              <div className="border border-dashed border-border p-4 rounded-xl text-center text-xs text-text-muted">
+                No long-term tasks assigned.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {assignments.slice(0, 4).map((assignment) => (
+                  <TimelineElement
+                    key={assignment.id}
+                    variant="assignment"
+                    title={assignment.title}
+                    timeLabel="Due This Week"
+                    isDeadlineNode={true}
+                    onShowDetails={() => setSelectedItem({ 
+                      title: assignment.title, 
+                      description: "Project assignment dashboard viewport tracker card." 
+                    })}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Traditional Project Grid Section */}
         <section>
-          <h2 className="mb-2 font-heading text-sm font-semibold text-text-primary">
-            {permissionLevel === "mentee" ? "Your assignments" : "Active assignments"}
+          <h2 className="mb-3 font-heading text-sm font-semibold text-text-primary">
+            {permissionLevel === "mentee" ? "Your Project Cards" : "Active Template Boards"}
           </h2>
 
-          {isLoading ? (
-            <div className="text-sm text-text-primary/50">Loading…</div>
+          {assignmentsLoading ? (
+            <div className="text-sm text-text-primary/50">Loading boards…</div>
           ) : !assignments || assignments.length === 0 ? (
             <EmptyState title="No active assignments" description="Check back once one is created." />
           ) : (
@@ -64,6 +163,15 @@ export default function DashboardPage() {
           </section>
         )}
       </div>
+
+      {selectedItem && (
+        <TimelineElementDetailsModal 
+          isOpen={true} 
+          title={selectedItem.title}
+          description={selectedItem.description}
+          onClose={() => setSelectedItem(null)} 
+        />
+      )}
     </AppShell>
   );
 }
@@ -76,7 +184,7 @@ function DashboardGreeting() {
       <h1 className="font-heading text-xl font-semibold text-text-primary">
         Welcome{fullName ? `, ${fullName}` : ""}
       </h1>
-      <p className="text-sm text-text-primary/60">Viewing as {role}.</p>
+      <p className="text-sm text-text-primary/60">Viewing as workspace {role}.</p>
     </div>
   );
 }

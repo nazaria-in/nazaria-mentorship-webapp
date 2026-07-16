@@ -1,6 +1,8 @@
 // /lib/api/mentee-assignments.ts
 
 import { createClient } from "@/lib/supabase/client";
+import { fetchPodMemberGroups } from "@/lib/api/pods";
+import type { UserRole } from "@/types/users";
 import type {
   AssignmentSubmissionSlot,
   MenteeAssignment,
@@ -250,4 +252,74 @@ export async function removeMenteeAssignment(menteeAssignmentId: string): Promis
   const supabase = createClient();
   const { error } = await supabase.from("mentee_assignments").delete().eq("id", menteeAssignmentId);
   if (error) throw error;
+}
+
+// ---- Dashboard timeline ----
+
+export interface MenteeAssignmentTimelineRow {
+  id: string;
+  mentee_id: string;
+  due_at: string;
+  is_completed: boolean;
+  assignment: { id: string; title: string } | null;
+}
+
+export interface FetchMenteeAssignmentsForTimelineParams {
+  role: UserRole;
+  userId: string | null;
+  rangeStart: string;
+  rangeEnd: string;
+}
+
+/**
+ * Role-scoped mentee_assignments for the dashboard timeline:
+ * - mentee: only their own rows (empty if not logged in).
+ * - mentor: rows for mentees in the mentor's own pod(s).
+ * - pm/associate: every row (staff oversight).
+ * Scoped to [rangeStart, rangeEnd) on due_at to match Timeline's range.
+ */
+export async function fetchMenteeAssignmentsForTimeline(
+  params: FetchMenteeAssignmentsForTimelineParams,
+): Promise<MenteeAssignmentTimelineRow[]> {
+  const { role, userId, rangeStart, rangeEnd } = params;
+  const supabase = createClient();
+
+  const SELECT = "id, mentee_id, due_at, is_completed, assignment:assignments(id, title)";
+
+  if (role === "mentee") {
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select(SELECT)
+      .eq("mentee_id", userId)
+      .gte("due_at", rangeStart)
+      .lt("due_at", rangeEnd);
+    if (error) throw error;
+    return (data ?? []) as unknown as MenteeAssignmentTimelineRow[];
+  }
+
+  if (role === "mentor") {
+    if (!userId) return [];
+    const podGroups = await fetchPodMemberGroups({ role: "mentee", mentorId: userId, includeEmptyPods: true });
+    const menteeIds = Array.from(new Set(podGroups.flatMap((pod) => pod.members.map((m) => m.id))));
+    if (menteeIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select(SELECT)
+      .in("mentee_id", menteeIds)
+      .gte("due_at", rangeStart)
+      .lt("due_at", rangeEnd);
+    if (error) throw error;
+    return (data ?? []) as unknown as MenteeAssignmentTimelineRow[];
+  }
+
+  // pm / associate: everything in range
+  const { data, error } = await supabase
+    .from("mentee_assignments")
+    .select(SELECT)
+    .gte("due_at", rangeStart)
+    .lt("due_at", rangeEnd);
+  if (error) throw error;
+  return (data ?? []) as unknown as MenteeAssignmentTimelineRow[];
 }
