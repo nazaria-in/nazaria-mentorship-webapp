@@ -66,7 +66,7 @@ export function ConversationsListPanel({
       onSelectForForward(conversationId);
       return;
     }
-    router.push(`/messages/${conversationId}`);
+    router.push(`/chat/${conversationId}`);
   }
 
   return (

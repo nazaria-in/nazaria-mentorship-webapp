@@ -1,4 +1,4 @@
-// /app/messages/layout.tsx
+// /app/chat/layout.tsx
 "use client";
 
 import { usePathname } from "next/navigation";

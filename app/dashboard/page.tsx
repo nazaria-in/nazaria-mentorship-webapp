@@ -8,7 +8,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
-import { fetchAssignments } from "@/lib/api/assignments";
+import { fetchAssignedAssignmentsForUser } from "@/lib/api/mentee-assignments";
 import { fetchMeetingsInRange } from "@/lib/api/meetings";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -54,8 +54,9 @@ export default function DashboardPage() {
 
   // Fetch active assignments safely with typed dataset
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
-    queryKey: ["assignments", "dashboard"],
-    queryFn: () => fetchAssignments({ isActive: true }),
+  queryKey: ["assignments", "dashboard", "assigned-to-me", userId, role],
+  queryFn: () => fetchAssignedAssignmentsForUser({ role, userId }),
+  enabled: !!userId,
   });
 
   // Fetch upcoming meetings using the existing range function setup

@@ -3,8 +3,7 @@
 
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
-import { FileOrLinkInput, type FileOrLinkValue } from "@/components/shared/FileOrLinkInput";
-import { uploadFile } from "@/lib/api/uploads";
+import { UploadBox, type UploadedFileRef } from "@/components/shared/uploadbox/UploadBox";
 import { submitVersion } from "@/lib/api/mentee-assignments";
 
 export interface AddSubmissionFormProps {
@@ -15,11 +14,12 @@ export interface AddSubmissionFormProps {
 }
 
 export function AddSubmissionForm({ slotId, menteeAssignmentId, nextVersionNumber, onSubmitted }: AddSubmissionFormProps) {
-  const [value, setValue] = React.useState<FileOrLinkValue>({ kind: "link", url: "" });
+  const [files, setFiles] = React.useState<UploadedFileRef[]>([]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const fileId = await uploadFile(value, { kind: "assignment_submission", menteeAssignmentId });
+      const fileId = files[0]?.id;
+      if (!fileId) throw new Error("No file uploaded");
       return submitVersion({
         mentee_assignment_id: menteeAssignmentId,
         slot_id: slotId,
@@ -28,12 +28,12 @@ export function AddSubmissionForm({ slotId, menteeAssignmentId, nextVersionNumbe
       });
     },
     onSuccess: () => {
-      setValue({ kind: "link", url: "" });
+      setFiles([]);
       onSubmitted();
     },
   });
 
-  const canSubmit = value.kind === "link" ? value.url.trim().length > 0 : !!value.file;
+  const canSubmit = files.length > 0;
 
   return (
     <form
@@ -43,10 +43,18 @@ export function AddSubmissionForm({ slotId, menteeAssignmentId, nextVersionNumbe
         if (canSubmit) mutation.mutate();
       }}
     >
-      <span className="text-xs font-medium text-text-primary/70">
+      <span className="text-xs font-medium text-text-primary/70 dark:text-text-primary/70">
         {nextVersionNumber === 1 ? "Add submission" : `Create new submission — v${nextVersionNumber}`}
       </span>
-      <FileOrLinkInput value={value} onChange={setValue} />
+
+      <UploadBox
+        value={files}
+        onChange={setFiles}
+        uploadContext={{ kind: "assignment_submission", menteeAssignmentId }}
+        multiple={false}
+        label="Upload your work"
+      />
+
       {mutation.isError && (
         <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive dark:bg-destructive/15">
           Couldn&apos;t submit. Try again.

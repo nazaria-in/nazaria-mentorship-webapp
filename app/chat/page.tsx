@@ -1,4 +1,4 @@
-// /app/messages/page.tsx
+// /app/chat/page.tsx
 "use client";
 
 import { MessageSquare } from "lucide-react";

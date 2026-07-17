@@ -1,4 +1,4 @@
-// /app/messages/[conversationId]/page.tsx
+// /app/chat/[conversationId]/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -13,7 +13,6 @@ import { useConversationThread } from "@/hooks/use-conversation-thread";
 import { useOversightConversations } from "@/hooks/use-conversations";
 import { sendMessage, deleteMessage, resolveConversationName, getComposerDisabledState } from "@/lib/api/messages";
 import type { Message } from "@/types/messages";
-// NOTE: adjust these two imports to match your actual session/role hooks if named differently.
 import { useSessionStore } from "@/store/session-store";
 import { useRole } from "@/providers/role-provider";
 

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchPodMemberGroups } from "@/lib/api/pods";
 import type { UserRole } from "@/types/users";
 import type {
+  Assignment,
   AssignmentSubmissionSlot,
   MenteeAssignment,
   MenteeAssignmentSummary,
@@ -322,4 +323,70 @@ export async function fetchMenteeAssignmentsForTimeline(
     .lt("due_at", rangeEnd);
   if (error) throw error;
   return (data ?? []) as unknown as MenteeAssignmentTimelineRow[];
+}
+
+
+export interface FetchAssignedAssignmentsForUserParams {
+  role: UserRole;
+  userId: string | null;
+}
+ 
+interface MenteeAssignmentWithAssignmentRow {
+  id: string;
+  mentee_id: string;
+  assignment: Assignment | null;
+}
+ 
+const ASSIGNED_SELECT = "id, mentee_id, assignment:assignments(*)";
+ 
+function dedupeByAssignmentId(rows: MenteeAssignmentWithAssignmentRow[]): Assignment[] {
+  const map = new Map<string, Assignment>();
+  for (const row of rows) {
+    if (row.assignment) map.set(row.assignment.id, row.assignment);
+  }
+  return Array.from(map.values());
+}
+ 
+/**
+ * Assignments actually dispatched to the logged-in user, via mentee_assignments
+ * (not the raw assignments table — an assignment only "belongs" to someone once
+ * it has a mentee_assignments row).
+ * - mentee: only their own dispatched assignments (empty if not logged in).
+ * - mentor: assignments dispatched to mentees in the mentor's own pod(s).
+ * - pm/associate: every dispatched assignment (staff oversight).
+ */
+export async function fetchAssignedAssignmentsForUser(
+  params: FetchAssignedAssignmentsForUserParams,
+): Promise<Assignment[]> {
+  const { role, userId } = params;
+  const supabase = createClient();
+ 
+  if (role === "mentee") {
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select(ASSIGNED_SELECT)
+      .eq("mentee_id", userId);
+    if (error) throw error;
+    return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
+  }
+ 
+  if (role === "mentor") {
+    if (!userId) return [];
+    const podGroups = await fetchPodMemberGroups({ role: "mentee", mentorId: userId, includeEmptyPods: true });
+    const menteeIds = Array.from(new Set(podGroups.flatMap((pod) => pod.members.map((m) => m.id))));
+    if (menteeIds.length === 0) return [];
+ 
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select(ASSIGNED_SELECT)
+      .in("mentee_id", menteeIds);
+    if (error) throw error;
+    return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
+  }
+ 
+  // pm / associate: everything dispatched, across all mentees
+  const { data, error } = await supabase.from("mentee_assignments").select(ASSIGNED_SELECT);
+  if (error) throw error;
+  return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
 }

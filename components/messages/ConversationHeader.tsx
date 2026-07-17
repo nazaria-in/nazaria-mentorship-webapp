@@ -26,7 +26,7 @@ export function ConversationHeader({ name, kind, seenByLabel }: ConversationHead
     <div className="flex items-center gap-3 border-b border-border dark:border-border bg-surface dark:bg-surface px-3 py-3">
       <button
         type="button"
-        onClick={() => router.push("/messages")}
+        onClick={() => router.push("/chat")}
         className="md:hidden rounded-full p-1 hover:bg-card-alt dark:hover:bg-card-alt"
         aria-label="Back to conversations"
       >
