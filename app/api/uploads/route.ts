@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { uploadFile as uploadToDrive } from "@/lib/google/drive-files";
+import { makeFilePubliclyViewable, uploadFile as uploadToDrive } from "@/lib/google/drive-files";
 import {
   resolveAssignmentMenteeFolder,
   resolveResourceMenteeFolder,
@@ -138,6 +138,8 @@ export async function POST(req: NextRequest) {
       data: blob,
       parentFolderId: folderId,
     });
+    await makeFilePubliclyViewable(driveFile.id);
+
 
     const fileUrl = driveFile.webViewLink ?? driveFile.webContentLink ?? "";
 

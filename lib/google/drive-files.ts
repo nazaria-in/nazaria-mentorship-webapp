@@ -1,6 +1,6 @@
 // /lib/google/drive-files.ts
 
-import { googleDriveFetch } from "./drive";
+import { googleDriveFetch, googleDriveUploadFetch } from "./drive";
 
 export interface GoogleDriveFile {
   id: string;
@@ -91,38 +91,43 @@ export async function uploadFile(
   const metadata = {
     name: input.name,
     mimeType: input.mimeType,
-    parents: input.parentFolderId
-      ? [input.parentFolderId]
-      : undefined,
+    parents: input.parentFolderId ? [input.parentFolderId] : undefined,
   };
 
-  const body = new Blob([
-    `--${boundary}\r
-Content-Type: application/json; charset=UTF-8\r
-\r
-${JSON.stringify(metadata)}\r
---${boundary}\r
-Content-Type: ${input.mimeType}\r
-\r
-`,
-    input.data,
-    `\r
---${boundary}--`,
+  const dataBuffer = Buffer.from(await input.data.arrayBuffer());
+
+  const bodyBuffer = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\n` +
+        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Type: ${input.mimeType}\r\n\r\n`,
+    ),
+    dataBuffer,
+    Buffer.from(`\r\n--${boundary}--`),
   ]);
 
-  // NOTE: `fields` is required here — without it Drive's multipart upload
-  // response only contains `id` and `kind`, so webViewLink/webContentLink
-  // come back undefined and the `files.url` we save is empty.
-  const response = await googleDriveFetch(
+  const response = await googleDriveUploadFetch(
     "/files?uploadType=multipart&fields=id,name,mimeType,webViewLink,webContentLink",
     {
       method: "POST",
       headers: {
         "Content-Type": `multipart/related; boundary=${boundary}`,
       },
-      body,
+      body: bodyBuffer,
     },
   );
 
   return (await response.json()) as GoogleDriveFile;
+}
+
+export async function makeFilePubliclyViewable(fileId: string): Promise<void> {
+  await googleDriveFetch(`/files/${fileId}/permissions`, {
+    method: "POST",
+    body: JSON.stringify({
+      role: "reader",
+      type: "anyone",
+    }),
+  });
 }
