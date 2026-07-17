@@ -9,19 +9,16 @@ import { PodMemberSelector } from "@/components/pods/PodMemberSelector";
 import { ResourceTemplateForm, type ResourceDraft } from "@/components/resources/ResourceTemplateForm";
 import { createResources, fetchResource, insertFileRecords, linkFilesToResource, updateResource } from "@/lib/api/resources";
 
-export interface ResourceFormModalProps {
+interface ResourceFormModalProps {
   open: boolean;
   onClose: () => void;
   mode: "create" | "edit";
-  resourceId?: string; // required when mode === "edit"
+  resourceId?: string;
   currentUserId: string;
-  /** Whether the person creating this is assigning it to themself (mentee) or dispatching to mentees (mentor/staff). */
   creatorRole: "mentee" | "mentor" | "staff";
-  /** Scopes the roster picker to a mentor's own pods; omit for PM/associate. */
   scopeToMentorId?: string;
   onSaved: () => void;
 }
-
 type Step = "details" | "roster";
 
 export function ResourceFormModal({ open, onClose, mode, resourceId, currentUserId, creatorRole, scopeToMentorId, onSaved }: ResourceFormModalProps) {
@@ -32,11 +29,16 @@ export function ResourceFormModal({ open, onClose, mode, resourceId, currentUser
 
   const needsRoster = mode === "create" && creatorRole !== "mentee";
 
-  const { data: existingResource, isLoading: loadingResource } = useQuery({
-    queryKey: ["resource", resourceId],
-    queryFn: () => fetchResource(resourceId!),
-    enabled: open && mode === "edit" && !!resourceId,
-  });
+const { data: existingResource, isLoading: loadingResource } = useQuery({
+  queryKey: ["resource", resourceId],
+  queryFn: async () => {
+    if (!resourceId) {
+      throw new Error("Missing resource ID");
+    }
+    return fetchResource(resourceId);
+  },
+  enabled: open && mode === "edit" && !!resourceId,
+});
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -121,7 +123,10 @@ export function ResourceFormModal({ open, onClose, mode, resourceId, currentUser
         loadingResource && mode === "edit" ? (
           <p className="p-4 text-sm text-text-primary/50">Loading resource…</p>
         ) : (
+        
           <ResourceTemplateForm
+            menteeId={currentUserId}
+            resourceId={resourceId}
             mode={mode}
             initialValues={mode === "edit" ? existingResource ?? undefined : undefined}
             onSaved={handleDetailsSaved}

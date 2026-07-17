@@ -5,6 +5,7 @@
 import * as React from "react";
 import { File as FileIcon, Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadRawFile, type UploadContext } from "@/lib/api/uploads";
 
 export type UploadBoxFileType = "file" | "image" | "document" | "other";
 
@@ -19,6 +20,7 @@ export interface UploadedFileRef {
 export interface UploadBoxProps {
   value: UploadedFileRef[];
   onChange: (files: UploadedFileRef[]) => void;
+  uploadContext: UploadContext;
   multiple?: boolean;
   accept?: string;
   label?: string;
@@ -26,52 +28,30 @@ export interface UploadBoxProps {
   className?: string;
 }
 
-function guessFileType(file: File): UploadBoxFileType {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type === "application/pdf" || file.type.includes("document") || file.type.includes("text")) {
-    return "document";
-  }
-  return "file";
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * Demo upload box — no real storage backend yet. Files are held as local
- * object URLs (`URL.createObjectURL`), which only work in this browser
- * session and aren't persisted anywhere. Good enough to build and test the
- * resources UI end-to-end; replace `simulateUpload` with a real upload
- * call (e.g. Supabase Storage) when that's wired up.
- */
-export function UploadBox({ value, onChange, multiple = true, accept, label = "Attach files", helperText, className }: UploadBoxProps) {
+export function UploadBox({
+  value,
+  onChange,
+  uploadContext,
+  multiple = true,
+  accept,
+  label = "Attach files",
+  helperText,
+  className,
+}: UploadBoxProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [uploadingCount, setUploadingCount] = React.useState(0);
-
-  function simulateUpload(file: File): Promise<UploadedFileRef> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: crypto.randomUUID(),
-          name: file.name,
-          url: URL.createObjectURL(file),
-          fileType: guessFileType(file),
-          sizeLabel: formatSize(file.size),
-        });
-      }, 500);
-    });
-  }
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
+    setUploadError(null);
     setUploadingCount((c) => c + files.length);
     try {
-      const uploaded = await Promise.all(files.map(simulateUpload));
+      const uploaded = await Promise.all(files.map((f) => uploadRawFile(f, uploadContext)));
       onChange(multiple ? [...value, ...uploaded] : uploaded.slice(0, 1));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploadingCount((c) => Math.max(0, c - files.length));
     }
@@ -114,6 +94,9 @@ export function UploadBox({ value, onChange, multiple = true, accept, label = "A
         }}
       />
       {helperText && <span className="text-[11px] text-text-primary/45">{helperText}</span>}
+      {uploadError && (
+        <span className="text-[11px] text-destructive">{uploadError}</span>
+      )}
 
       {value.length > 0 && (
         <ul className="flex flex-col gap-1.5">

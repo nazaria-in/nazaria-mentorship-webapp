@@ -5,7 +5,7 @@
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UploadBox, type UploadedFileRef } from "@/components/shared/uploadbox/UploadBox";
-import { createResourceUpdate, insertFileRecords } from "@/lib/api/resources";
+import { createResourceUpdate } from "@/lib/api/resources";
 
 export interface ResourceUpdateFormProps {
   resourceId: string;
@@ -22,20 +22,13 @@ export function ResourceUpdateForm({ resourceId, menteeId, onCreated }: Resource
 
   const mutation = useMutation({
     mutationFn: async () => {
-      let fileId: string | null = null;
-      if (file.length > 0) {
-        const [attached] = file;
-        const [insertedId] = await insertFileRecords([{ title: attached.name, url: attached.url, fileType: attached.fileType }], menteeId);
-        fileId = insertedId ?? null;
-      }
-
       return createResourceUpdate({
         resourceId,
         menteeId,
         progressNote: progressNote.trim(),
         progressPercent: progressPercent.trim() ? Number(progressPercent) : null,
         hoursSpent: hoursSpent.trim() ? Number(hoursSpent) : null,
-        fileId,
+        fileId: file[0]?.id ?? null, // UploadBox already created the files row
       });
     },
     onSuccess: () => {
@@ -93,7 +86,13 @@ export function ResourceUpdateForm({ resourceId, menteeId, onCreated }: Resource
         </label>
       </div>
 
-      <UploadBox value={file} onChange={setFile} multiple={false} label="Attach a file (optional)" />
+      <UploadBox
+        value={file}
+        onChange={setFile}
+        multiple={false}
+        label="Attach a file (optional)"
+        uploadContext={{ kind: "resource_update", resourceId, menteeId }}
+      />
 
       {mutation.isError && (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive dark:bg-destructive/15">

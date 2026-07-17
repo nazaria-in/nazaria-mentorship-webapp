@@ -23,9 +23,11 @@ export interface ResourceTemplateFormProps {
   onSaved: (draft: ResourceDraft) => void;
   onCancel: () => void;
   submitLabel: string;
+  resourceId?: string;
+  menteeId: string;
 }
 
-export function ResourceTemplateForm({ mode, initialValues, onSaved, onCancel, submitLabel }: ResourceTemplateFormProps) {
+export function ResourceTemplateForm({ resourceId, menteeId, mode, initialValues, onSaved, onCancel, submitLabel }: ResourceTemplateFormProps) {
   const [type, setType] = React.useState<ResourceCourseType>(initialValues?.type ?? "guide");
   const [title, setTitle] = React.useState(initialValues?.title ?? "");
   const [description, setDescription] = React.useState(initialValues?.description ?? "");
@@ -164,9 +166,19 @@ export function ResourceTemplateForm({ mode, initialValues, onSaved, onCancel, s
           </ul>
         </div>
       )}
-
-      <UploadBox value={newFiles} onChange={setNewFiles} label="Add files" helperText="Demo upload — not yet backed by real storage." />
-
+    
+{resourceId && (
+  <UploadBox
+    value={newFiles}
+    onChange={setNewFiles}
+    label="Add files"
+    uploadContext={{
+      kind: "resource_update",
+      resourceId,
+      menteeId,
+    }}
+  />
+)}
       <div className="flex gap-2">
         <button
           type="submit"

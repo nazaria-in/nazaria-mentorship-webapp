@@ -19,8 +19,7 @@ export function AddSubmissionForm({ slotId, menteeAssignmentId, nextVersionNumbe
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // link mode: create a `files` row pointing at the URL; file mode: upload then get files.id
-      const fileId = await uploadFile(value);
+      const fileId = await uploadFile(value, { kind: "assignment_submission", menteeAssignmentId });
       return submitVersion({
         mentee_assignment_id: menteeAssignmentId,
         slot_id: slotId,

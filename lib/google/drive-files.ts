@@ -18,18 +18,44 @@ export interface CreateFolderInput {
 export async function createFolder(
   input: CreateFolderInput,
 ): Promise<GoogleDriveFile> {
-  const response = await googleDriveFetch("/files", {
-    method: "POST",
-    body: JSON.stringify({
-      name: input.name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: input.parentFolderId
-        ? [input.parentFolderId]
-        : undefined,
-    }),
-  });
+  const response = await googleDriveFetch(
+    "/files?fields=id,name,mimeType,webViewLink,webContentLink",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: input.name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: input.parentFolderId
+          ? [input.parentFolderId]
+          : undefined,
+      }),
+    },
+  );
 
   return (await response.json()) as GoogleDriveFile;
+}
+
+/**
+ * Finds a folder by exact name under a given parent. Returns null if none
+ * exists. Used by drive-folders.ts to make folder resolution idempotent —
+ * always search before create, never assume a folder is missing.
+ */
+export async function findFolderByName(
+  name: string,
+  parentFolderId: string,
+): Promise<GoogleDriveFile | null> {
+  const q = `name = '${escapeDriveQueryValue(name)}' and '${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const response = await googleDriveFetch(
+    `/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=1`,
+  );
+  const data = (await response.json()) as { files: GoogleDriveFile[] };
+  return data.files[0] ?? null;
+}
+
+function escapeDriveQueryValue(value: string): string {
+  // Drive's query language uses single-quoted string literals; both the
+  // quote and the escape character itself need escaping.
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 export async function getFileMetadata(
@@ -84,8 +110,11 @@ Content-Type: ${input.mimeType}\r
 --${boundary}--`,
   ]);
 
+  // NOTE: `fields` is required here — without it Drive's multipart upload
+  // response only contains `id` and `kind`, so webViewLink/webContentLink
+  // come back undefined and the `files.url` we save is empty.
   const response = await googleDriveFetch(
-    "/files?uploadType=multipart",
+    "/files?uploadType=multipart&fields=id,name,mimeType,webViewLink,webContentLink",
     {
       method: "POST",
       headers: {

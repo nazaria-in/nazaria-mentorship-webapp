@@ -2,18 +2,60 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { FileOrLinkValue } from "@/components/shared/FileOrLinkInput";
+import type { UploadBoxFileType, UploadedFileRef } from "@/components/shared/uploadbox/UploadBox";
 
-// Resolves either a pasted link or a picked File into a `files.id`.
-// Link mode: just inserts a `files` row with file_type='link' and the url.
-// File mode: uploads to Supabase Storage first, then inserts the `files` row
-// pointing at the resulting public URL. Swap the bucket name for your project's.
-export async function uploadFile(value: FileOrLinkValue): Promise<string> {
+export type UploadContext =
+  | { kind: "assignment_submission"; menteeAssignmentId: string }
+  | { kind: "resource_update"; resourceId: string; menteeId: string };
+
+function guessFileType(mimeType: string): UploadBoxFileType {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "application/pdf" || mimeType.includes("document") || mimeType.includes("text")) {
+    return "document";
+  }
+  return "file";
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function postToUploadRoute(file: File, context: UploadContext): Promise<{ id: string; url: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("contextKind", context.kind);
+  if (context.kind === "assignment_submission") {
+    formData.append("menteeAssignmentId", context.menteeAssignmentId);
+  } else {
+    formData.append("resourceId", context.resourceId);
+    formData.append("menteeId", context.menteeId);
+  }
+
+  const response = await fetch("/api/uploads", { method: "POST", body: formData });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}) as { error?: string });
+    throw new Error(body.error ?? "Upload failed");
+  }
+
+  const result = (await response.json()) as { fileId: string; url: string };
+  return { id: result.fileId, url: result.url };
+}
+
+// Used by AddSubmissionForm's link-or-file input. Link mode: inserts a
+// `files` row directly. File mode: routes through /api/uploads, which does
+// the real Drive upload server-side and creates the `files` row itself.
+export async function uploadFile(value: FileOrLinkValue, context: UploadContext): Promise<string> {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id;
   if (!userId) throw new Error("Not authenticated");
 
   if (value.kind === "link") {
+    // NOTE: file_type "link" is not a valid link_type enum value today
+    // ({file,image,document,other}) — this insert will fail as-is. Flagging,
+    // not fixing here since it's outside today's Drive scope.
     const { data, error } = await supabase
       .from("files")
       .insert({ url: value.url, file_type: "link", created_by: userId })
@@ -24,22 +66,19 @@ export async function uploadFile(value: FileOrLinkValue): Promise<string> {
   }
 
   if (!value.file) throw new Error("No file selected");
-  const path = `${userId}/${Date.now()}-${value.file.name}`;
-  const { error: uploadError } = await supabase.storage.from("submissions").upload(path, value.file);
-  if (uploadError) throw uploadError;
+  const { id } = await postToUploadRoute(value.file, context);
+  return id;
+}
 
-  const { data: publicUrlData } = supabase.storage.from("submissions").getPublicUrl(path);
-
-  const { data, error } = await supabase
-    .from("files")
-    .insert({
-      title: value.file.name,
-      url: publicUrlData.publicUrl,
-      file_type: "file",
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-  return data.id as string;
+// Used by UploadBox for the "upload immediately on pick" flow. Returns the
+// already-created files.id — callers should NOT insert a files row again.
+export async function uploadRawFile(file: File, context: UploadContext): Promise<UploadedFileRef> {
+  const { id, url } = await postToUploadRoute(file, context);
+  return {
+    id,
+    name: file.name,
+    url,
+    fileType: guessFileType(file.type),
+    sizeLabel: formatSize(file.size),
+  };
 }

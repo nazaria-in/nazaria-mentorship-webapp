@@ -38,10 +38,14 @@ interface ResourceListRow {
   assigned_user: { full_name: string | null } | null;
 }
 
-interface FormModalState {
-  mode: "create" | "edit";
-  resourceId?: string;
-}
+type FormModalState =
+  | {
+      mode: "create";
+    }
+  | {
+      mode: "edit";
+      resourceId: string;
+    };
 
 const STATUS_SECTIONS: { status: ResourceStatus; label: string; accent: string }[] = [
   { status: "ongoing", label: "Ongoing", accent: "bg-primary" },
@@ -176,7 +180,10 @@ export default function ResourcesListPage() {
           open={!!formModal}
           onClose={() => setFormModal(null)}
           mode={formModal.mode}
-          resourceId={formModal.resourceId}
+          resourceId={    
+    formModal.mode === "edit"
+      ? formModal.resourceId
+      : undefined}
           currentUserId={userId}
           creatorRole={permissionLevel}
           scopeToMentorId={scopeToMentorId}
