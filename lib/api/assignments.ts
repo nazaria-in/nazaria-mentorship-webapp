@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { Assignment, AssignmentSubmissionSlot, AssignmentWithSlots } from "@/types/assignments";
+import { UserRole } from "@/types/users";
 
 export async function fetchAssignment(assignmentId: string): Promise<AssignmentWithSlots> {
   const supabase = createClient();
@@ -139,4 +140,49 @@ export async function deleteSlot(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("assignment_submission_slots").delete().eq("id", id);
   if (error) throw error;
+}
+
+
+export interface FetchAssignmentsForRoleParams {
+  role: UserRole;
+  userId: string | null;
+}
+
+interface MenteeAssignmentJoinRow {
+  assignment: Assignment | null;
+}
+
+export async function fetchAssignmentsForRole(
+  params: FetchAssignmentsForRoleParams
+): Promise<Assignment[]> {
+  const { role, userId } = params;
+  const supabase = createClient();
+
+  if (role === "mentee") {
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select("assignment:assignments(*)")
+      .eq("mentee_id", userId);
+    if (error) throw error;
+
+    const rows = (data ?? []) as unknown as MenteeAssignmentJoinRow[];
+    const map = new Map<string, Assignment>();
+    for (const row of rows) {
+      if (row.assignment && !row.assignment.deleted_at) {
+        map.set(row.assignment.id, row.assignment);
+      }
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+    );
+  }
+
+  if (role === "mentor") {
+    if (!userId) return [];
+    return fetchAssignments({ createdBy: userId });
+  }
+
+  // pm / associate: everything
+  return fetchAssignments();
 }

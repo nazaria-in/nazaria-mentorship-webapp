@@ -53,12 +53,12 @@ export async function uploadFile(value: FileOrLinkValue, context: UploadContext)
   if (!userId) throw new Error("Not authenticated");
 
   if (value.kind === "link") {
-    // NOTE: file_type "link" is not a valid link_type enum value today
-    // ({file,image,document,other}) — this insert will fail as-is. Flagging,
-    // not fixing here since it's outside today's Drive scope.
+    // file_type "link" is NOT a valid link_type enum value ({file,image,document,other}).
+    // Using "other" instead — it's the correct bucket for externally-hosted links
+    // where we don't know/care about the underlying mime type.
     const { data, error } = await supabase
       .from("files")
-      .insert({ url: value.url, file_type: "link", created_by: userId })
+      .insert({ url: value.url, file_type: "other", created_by: userId })
       .select("id")
       .single();
     if (error) throw error;
@@ -80,5 +80,36 @@ export async function uploadRawFile(file: File, context: UploadContext): Promise
     url,
     fileType: guessFileType(file.type),
     sizeLabel: formatSize(file.size),
+  };
+}
+
+// Creates a `files` row for a plain external link (e.g. a public Google
+// Drive share link pasted by a mentee) without going through /api/uploads.
+// `context` is accepted for signature symmetry with the other creators and
+// so future work (e.g. logging which submission a link belongs to) has it
+// on hand, but it isn't persisted anywhere today — the files table has no
+// context-tracking columns.
+export async function createFileFromLink(url: string, context: UploadContext): Promise<UploadedFileRef> {
+  void context;
+  const supabase = createClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Not authenticated");
+
+  const { data, error } = await supabase
+    .from("files")
+    .insert({ url, file_type: "other", created_by: userId })
+    .select("id, url")
+    .single();
+  if (error) throw error;
+
+  const row = data as { id: string; url: string };
+  return {
+    id: row.id,
+    name: url,
+    url: row.url,
+    fileType: "other",
+    sizeLabel: "",
   };
 }
