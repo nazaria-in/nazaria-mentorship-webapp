@@ -6,29 +6,26 @@ import { createClient } from "@/lib/supabase/client";
 import { ExitSurveyForm } from "@/components/exit-survey/ExitSurveyForm";
 import {
   fetchPendingExitSurveys,
+  getExitSurveyById,
   submitExitSurvey,
   type PendingExitSurvey,
 } from "@/lib/api/exit-surveys";
-import type { ExitSurveyRole, ExitSurveySubmission } from "@/types/exit-survey";
+import type { ExitSurveyRole, ExitSurveyRow, ExitSurveySubmission } from "@/types/exit-survey";
 
 /**
- * Dev-only page. Unlike the earlier version, this uses the REAL logged-in
- * session and pulls the REAL list of meetings still needing an exit survey
- * (via v_pending_exit_surveys) instead of a hardcoded meetingId. This is
- * what makes the "log in as mentor in one browser profile, mentee in
- * another" demo flow work — each session sees only its own pending list.
- *
- * Run the seeder first (scripts/seed/exitSurveyDemoSeeder.ts) to get
- * accounts + a meeting to test against.
+ * Dev-only page. Uses the real logged-in session and the real pending list
+ * (rows are now pre-created at meeting-creation time — see
+ * /app/api/meetings/route.ts — so "pending" means "row exists, not yet
+ * submitted" rather than "no row yet"). Selecting a pending item fetches
+ * that row's frozen template_snapshot and renders the form from it.
  */
 export default function ExitSurveyDemoPage() {
-  const [userId, setUserId] = useState<string | null>(null);
   const [role, setRole] = useState<ExitSurveyRole | null>(null);
   const [pending, setPending] = useState<PendingExitSurvey[]>([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [selectedRow, setSelectedRow] = useState<ExitSurveyRow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [submittedMeetingId, setSubmittedMeetingId] = useState<string | null>(null);
+  const [submittedCount, setSubmittedCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +68,6 @@ export default function ExitSurveyDemoPage() {
         const pendingSurveys = await fetchPendingExitSurveys(authUser.id);
 
         if (!cancelled) {
-          setUserId(authUser.id);
           setRole(userRole as ExitSurveyRole);
           setPending(pendingSurveys);
         }
@@ -88,11 +84,25 @@ export default function ExitSurveyDemoPage() {
     };
   }, []);
 
+  async function handleSelect(exitSurveyId: string) {
+    setLoadError(null);
+    try {
+      const row = await getExitSurveyById(exitSurveyId);
+      if (!row) {
+        setLoadError("Couldn't load that exit survey row.");
+        return;
+      }
+      setSelectedRow(row);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load exit survey.");
+    }
+  }
+
   async function handleSubmit(submission: ExitSurveySubmission) {
     await submitExitSurvey(submission);
-    setSubmittedMeetingId(submission.meetingId);
-    setPending((prev) => prev.filter((p) => p.meetingId !== submission.meetingId));
-    setSelectedMeetingId(null);
+    setSubmittedCount((n) => n + 1);
+    setPending((prev) => prev.filter((p) => p.exitSurveyId !== submission.exitSurveyId));
+    setSelectedRow(null);
   }
 
   if (isLoading) {
@@ -107,7 +117,7 @@ export default function ExitSurveyDemoPage() {
     );
   }
 
-  if (!userId || !role) return null;
+  if (!role) return null;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
@@ -120,47 +130,51 @@ export default function ExitSurveyDemoPage() {
         </p>
       </div>
 
-      {submittedMeetingId && (
+      {submittedCount > 0 && !selectedRow && (
         <p className="rounded-lg bg-card-alt p-3 text-sm text-text-primary dark:bg-card-alt dark:text-text-primary">
-          Exit survey submitted for that meeting.
+          {submittedCount} exit survey{submittedCount > 1 ? "s" : ""} submitted this session.
         </p>
       )}
 
-      {pending.length === 0 ? (
+      {pending.length === 0 && !selectedRow ? (
         <p className="text-sm text-text-muted dark:text-text-muted">
           No pending exit surveys — nothing left to fill in.
         </p>
-      ) : selectedMeetingId ? (
+      ) : selectedRow ? (
         <>
           <button
             type="button"
-            onClick={() => setSelectedMeetingId(null)}
+            onClick={() => setSelectedRow(null)}
             className="w-fit text-sm text-text-muted underline dark:text-text-muted"
           >
             ← Back to list
           </button>
           <ExitSurveyForm
-            meetingId={selectedMeetingId}
-            userId={userId}
-            role={role}
+            exitSurveyId={selectedRow.id}
+            role={selectedRow.userRole}
+            templateSnapshot={selectedRow.templateSnapshot}
+            subjectFullName={
+              pending.find((p) => p.exitSurveyId === selectedRow.id)?.subjectFullName ?? undefined
+            }
             onSubmit={handleSubmit}
           />
         </>
       ) : (
         <div className="flex flex-col gap-2">
-          {pending.map((meeting) => (
+          {pending.map((item) => (
             <button
-              key={meeting.meetingId}
+              key={item.exitSurveyId}
               type="button"
-              onClick={() => setSelectedMeetingId(meeting.meetingId)}
+              onClick={() => handleSelect(item.exitSurveyId)}
               className="surface-card flex items-center justify-between text-left dark:surface-card"
             >
               <div>
                 <p className="text-sm font-medium text-text-primary dark:text-text-primary">
-                  {meeting.title}
+                  {item.title}
+                  {role === "mentor" && item.subjectFullName ? ` — about ${item.subjectFullName}` : ""}
                 </p>
                 <p className="text-xs text-text-muted dark:text-text-muted">
-                  {new Date(meeting.startsAt).toLocaleString()}
+                  {new Date(item.startsAt).toLocaleString()}
                 </p>
               </div>
               <span className="text-sm text-text-accent dark:text-text-accent">Fill exit survey →</span>

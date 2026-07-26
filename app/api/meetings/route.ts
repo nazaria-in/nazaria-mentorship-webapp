@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createCalendarEvent } from "@/lib/google/calendar-events";
 import type { UserRole } from "@/types/users";
+import type { ExitSurveyTemplateEntry } from "@/types/exit-survey";
 
 interface CreateMeetingRequestBody {
   title: string;
@@ -133,16 +134,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to create meeting" }, { status: 500 });
   }
 
+  const meetingId = meeting.id as string;
+
   const participantRows = [
     {
-      meeting_id: meeting.id as string,
+      meeting_id: meetingId,
       user_id: authUser.id,
       status: "accepted" as const,
       invited_by: authUser.id,
       responded_at: new Date().toISOString(),
     },
     ...participantIds.map((id) => ({
-      meeting_id: meeting.id as string,
+      meeting_id: meetingId,
       user_id: id,
       status: "pending" as const,
       invited_by: authUser.id,
@@ -156,5 +159,83 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Meeting created but failed to add participants" }, { status: 500 });
   }
 
+  // Best-effort: create pending exit_surveys rows for this meeting. Failure
+  // here shouldn't fail meeting creation — logged, not thrown, since the
+  // meeting and its participants are already committed at this point.
+  try {
+    await createPendingExitSurveys(meetingId, allUserIds);
+  } catch (exitSurveyError) {
+    console.error("[meetings] Failed to create pending exit surveys", exitSurveyError);
+  }
+
   return NextResponse.json({ meeting }, { status: 201 });
+}
+
+/**
+ * One pending row per mentee for their own survey, plus one pending row
+ * per (mentor, mentee) pair for that mentor's survey about that specific
+ * mentee — this is what makes "mentor fills one exit survey per mentee in
+ * the meeting" happen automatically. Uses whichever template is currently
+ * marked active for each role; if a role has no active template yet, that
+ * role's rows are simply skipped (flagged via console.warn) rather than
+ * blocking meeting creation.
+ */
+async function createPendingExitSurveys(meetingId: string, participantIds: string[]): Promise<void> {
+  const admin = supabaseAdmin;
+
+  const { data: profiles, error: profilesError } = await admin
+    .from("users")
+    .select("id, role")
+    .in("id", participantIds);
+  if (profilesError) throw new Error(profilesError.message);
+
+  const mentorIds = (profiles ?? []).filter((p) => p.role === "mentor").map((p) => p.id as string);
+  const menteeIds = (profiles ?? []).filter((p) => p.role === "mentee").map((p) => p.id as string);
+
+  if (mentorIds.length === 0 && menteeIds.length === 0) return;
+
+  const { data: templates, error: templatesError } = await admin
+    .from("exit_survey_templates")
+    .select("id, role, questions")
+    .in("role", ["mentor", "mentee"])
+    .eq("is_active", true);
+  if (templatesError) throw new Error(templatesError.message);
+
+  const mentorTemplate = (templates ?? []).find((t) => t.role === "mentor");
+  const menteeTemplate = (templates ?? []).find((t) => t.role === "mentee");
+
+  if (!mentorTemplate) console.warn("[meetings] No active mentor exit survey template — skipping mentor rows.");
+  if (!menteeTemplate) console.warn("[meetings] No active mentee exit survey template — skipping mentee rows.");
+
+  const rows: Record<string, unknown>[] = [];
+
+  for (const menteeId of menteeIds) {
+    if (menteeTemplate) {
+      rows.push({
+        meeting_id: meetingId,
+        user_id: menteeId,
+        subject_user_id: menteeId,
+        user_role: "mentee",
+        template_id: menteeTemplate.id,
+        template_snapshot: menteeTemplate.questions as ExitSurveyTemplateEntry[],
+      });
+    }
+    if (mentorTemplate) {
+      for (const mentorId of mentorIds) {
+        rows.push({
+          meeting_id: meetingId,
+          user_id: mentorId,
+          subject_user_id: menteeId,
+          user_role: "mentor",
+          template_id: mentorTemplate.id,
+          template_snapshot: mentorTemplate.questions as ExitSurveyTemplateEntry[],
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  const { error: insertError } = await admin.from("exit_surveys").insert(rows);
+  if (insertError) throw new Error(insertError.message);
 }

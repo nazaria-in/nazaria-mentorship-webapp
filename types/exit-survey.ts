@@ -27,35 +27,38 @@ export const EXIT_SURVEY_CONCERN_TAGS = [
 export type ExitSurveyConcernTag = (typeof EXIT_SURVEY_CONCERN_TAGS)[number];
 
 /**
- * Each entry snapshots exactly what was shown and what was picked, so a
- * later template rewrite never invalidates historical rows. Frontend
- * decides which entries appear (including conditional "why" follow-ups) —
- * the backend never validates against a template, only against this shape.
+ * A question definition, used both by the PM/associate template editor and
+ * by the form renderer. `id` is a stable key independent of the question
+ * text — editing a template's wording later never breaks answer lookups
+ * for in-flight (already-snapshotted) forms, since those forms hold their
+ * own frozen copy of this shape.
  */
+export type ExitSurveyTemplateEntry = (
+  | { component: "single_select"; options: string[] }
+  | { component: "multi_select"; options: string[] }
+  | { component: "rating"; scale: number }
+  | { component: "short_answer" }
+) & {
+  id: string;
+  question: string;
+  showIf?: { questionId: string; equals: string | string[] };
+};
+
+/** A submitted answer — same component/id, plus what was actually picked. */
 export type ExitSurveyEntry =
-  | {
-      type: "single_select";
-      question: string;
-      options: string[];
-      selected: string;
-    }
-  | {
-      type: "multi_select";
-      question: string;
-      options: string[];
-      selected: string[];
-    }
-  | {
-      type: "rating";
-      question: string;
-      scale: number; // 5, per the current forms
-      selected: number;
-    }
-  | {
-      type: "short_answer";
-      question: string;
-      selected: string;
-    };
+  | { id: string; component: "single_select"; question: string; options: string[]; selected: string }
+  | { id: string; component: "multi_select"; question: string; options: string[]; selected: string[] }
+  | { id: string; component: "rating"; question: string; scale: number; selected: number }
+  | { id: string; component: "short_answer"; question: string; selected: string };
+
+export interface ExitSurveyTemplate {
+  id: string;
+  title: string;
+  role: ExitSurveyRole;
+  questions: ExitSurveyTemplateEntry[];
+  isActive: boolean;
+  createdAt: string;
+}
 
 /** What Gemini returns from the single transcribe+analyze call. */
 export interface ExitSurveyAiAnalysis {
@@ -66,26 +69,29 @@ export interface ExitSurveyAiAnalysis {
   followUpUrgency: ExitSurveyUrgency;
 }
 
+/** A pending or submitted exit_surveys row. */
 export interface ExitSurveyRow {
   id: string;
   meetingId: string;
   userId: string;
+  subjectUserId: string;
   userRole: ExitSurveyRole;
-  answers: ExitSurveyEntry[];
-  signal: ExitSurveySignal;
+  templateId: string | null;
+  templateSnapshot: ExitSurveyTemplateEntry[];
+  answers: ExitSurveyEntry[] | null;
+  signal: ExitSurveySignal | null;
   transcript: string | null;
   aiSummary: string | null;
   concernTags: ExitSurveyConcernTag[];
   needsFollowUp: boolean;
   followUpUrgency: ExitSurveyUrgency;
   createdAt: string;
+  submittedAt: string | null;
 }
 
-/** Shape used when inserting a new submission (id/createdAt are server-assigned). */
+/** Payload for filling in an already-existing pending row. */
 export interface ExitSurveySubmission {
-  meetingId: string;
-  userId: string;
-  userRole: ExitSurveyRole;
+  exitSurveyId: string;
   answers: ExitSurveyEntry[];
   signal: ExitSurveySignal;
   transcript?: string;
@@ -95,13 +101,12 @@ export interface ExitSurveySubmission {
   followUpUrgency?: ExitSurveyUrgency;
 }
 
-/** Runtime shape check before insert — see rationale in lib/exit-survey/validate.ts */
 export function isValidExitSurveyEntry(value: unknown): value is ExitSurveyEntry {
   if (typeof value !== "object" || value === null) return false;
   const entry = value as Record<string, unknown>;
-  if (typeof entry.question !== "string") return false;
+  if (typeof entry.id !== "string" || typeof entry.question !== "string") return false;
 
-  switch (entry.type) {
+  switch (entry.component) {
     case "single_select":
       return (
         Array.isArray(entry.options) &&
@@ -123,3 +128,4 @@ export function isValidExitSurveyEntry(value: unknown): value is ExitSurveyEntry
       return false;
   }
 }
+

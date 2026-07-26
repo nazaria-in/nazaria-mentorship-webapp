@@ -1,0 +1,99 @@
+// /lib/api/exit-survey-templates.ts
+
+import { createClient } from "@/lib/supabase/client";
+import type { ExitSurveyRole, ExitSurveyTemplate, ExitSurveyTemplateEntry } from "@/types/exit-survey";
+
+export async function fetchTemplatesForRole(role: ExitSurveyRole): Promise<ExitSurveyTemplate[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("exit_survey_templates")
+    .select()
+    .eq("role", role)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapTemplateRow);
+}
+
+export async function fetchActiveTemplate(role: ExitSurveyRole): Promise<ExitSurveyTemplate | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("exit_survey_templates")
+    .select()
+    .eq("role", role)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? mapTemplateRow(data) : null;
+}
+
+export interface SaveTemplateInput {
+  title: string;
+  role: ExitSurveyRole;
+  questions: ExitSurveyTemplateEntry[];
+  createdBy: string;
+}
+
+export async function createTemplate(input: SaveTemplateInput): Promise<ExitSurveyTemplate> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("exit_survey_templates")
+    .insert({
+      title: input.title,
+      role: input.role,
+      questions: input.questions,
+      created_by: input.createdBy,
+      is_active: false, // created inactive — call activateTemplate() explicitly
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Failed to create template.");
+  return mapTemplateRow(data);
+}
+
+export async function updateTemplateQuestions(
+  templateId: string,
+  questions: ExitSurveyTemplateEntry[]
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("exit_survey_templates")
+    .update({ questions })
+    .eq("id", templateId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Activates this template and deactivates whatever was previously active
+ * for the same role (the DB's partial unique index would reject having two
+ * active rows for one role at once, so the deactivate has to happen first).
+ */
+export async function activateTemplate(templateId: string, role: ExitSurveyRole): Promise<void> {
+  const supabase = createClient();
+
+  const { error: deactivateError } = await supabase
+    .from("exit_survey_templates")
+    .update({ is_active: false })
+    .eq("role", role)
+    .eq("is_active", true);
+  if (deactivateError) throw new Error(deactivateError.message);
+
+  const { error: activateError } = await supabase
+    .from("exit_survey_templates")
+    .update({ is_active: true })
+    .eq("id", templateId);
+  if (activateError) throw new Error(activateError.message);
+}
+
+function mapTemplateRow(row: Record<string, unknown>): ExitSurveyTemplate {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    role: row.role as ExitSurveyRole,
+    questions: row.questions as ExitSurveyTemplateEntry[],
+    isActive: row.is_active as boolean,
+    createdAt: row.created_at as string,
+  };
+}

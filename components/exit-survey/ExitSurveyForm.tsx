@@ -1,13 +1,7 @@
 // /components/exit-survey/ExitSurveyForm.tsx
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  getTemplateForRole,
-  getVisibleTemplateEntries,
-  MENTEE_ACTION_ITEM_QUESTION,
-  type ExitSurveyTemplateEntry,
-} from "@/lib/exit-survey/templates";
+import { useEffect, useMemo, useState } from "react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { transcribeAudio } from "@/lib/api/exit-survey-transcribe";
 import type {
@@ -16,13 +10,16 @@ import type {
   ExitSurveyRole,
   ExitSurveySignal,
   ExitSurveySubmission,
+  ExitSurveyTemplateEntry,
   ExitSurveyUrgency,
 } from "@/types/exit-survey";
 
 interface ExitSurveyFormProps {
-  meetingId: string;
-  userId: string;
+  exitSurveyId: string;
   role: ExitSurveyRole;
+  templateSnapshot: ExitSurveyTemplateEntry[];
+  /** Mentor forms are about a specific mentee — shown as context above the form. */
+  subjectFullName?: string | null;
   onSubmit: (submission: ExitSurveySubmission) => Promise<void>;
 }
 
@@ -30,8 +27,13 @@ type AnswerValue = string | string[] | number;
 
 const TRANSCRIPT_REQUIRED_ROLES: ExitSurveyRole[] = ["mentor"];
 
-export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurveyFormProps) {
-  const template = useMemo(() => getTemplateForRole(role), [role]);
+export function ExitSurveyForm({
+  exitSurveyId,
+  role,
+  templateSnapshot,
+  subjectFullName,
+  onSubmit,
+}: ExitSurveyFormProps) {
   const [answerValues, setAnswerValues] = useState<Record<string, AnswerValue>>({});
   const [signal, setSignal] = useState<ExitSurveySignal | null>(null);
   const [transcript, setTranscript] = useState<string>("");
@@ -45,23 +47,40 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
 
   const recorder = useAudioRecorder();
 
-  const visibleEntries = getVisibleTemplateEntries(
-    template,
-    answerValues as Partial<Record<string, ExitSurveyEntry["selected"]>>
+  // Playback: build an object URL for whatever's currently recorded so the
+  // person can listen back before deciding to transcribe or discard it.
+const playbackUrl = useMemo(() => {
+    if (recorder.status === "stopped" && recorder.audioBlob) {
+      return URL.createObjectURL(recorder.audioBlob);
+    }
+    return null;
+  }, [recorder.status, recorder.audioBlob]);
+
+  useEffect(() => {
+    return () => {
+      if (playbackUrl) {
+        URL.revokeObjectURL(playbackUrl);
+      }
+    };
+  }, [playbackUrl]);
+
+  const visibleEntries = useMemo(
+    () => getVisibleEntries(templateSnapshot, answerValues),
+    [templateSnapshot, answerValues]
   );
 
   const transcriptRequired = TRANSCRIPT_REQUIRED_ROLES.includes(role);
 
-  function setAnswer(question: string, value: AnswerValue) {
-    setAnswerValues((prev) => ({ ...prev, [question]: value }));
+  function setAnswer(questionId: string, value: AnswerValue) {
+    setAnswerValues((prev) => ({ ...prev, [questionId]: value }));
   }
 
-  function toggleMultiSelectOption(question: string, option: string) {
-    const current = (answerValues[question] as string[] | undefined) ?? [];
+  function toggleMultiSelectOption(questionId: string, option: string) {
+    const current = (answerValues[questionId] as string[] | undefined) ?? [];
     const next = current.includes(option)
       ? current.filter((o) => o !== option)
       : [...current, option];
-    setAnswer(question, next);
+    setAnswer(questionId, next);
   }
 
   async function handleRecordToggle() {
@@ -73,10 +92,7 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
   }
 
   function buildAnswersPayload(): ExitSurveyEntry[] {
-    return visibleEntries.map((templateEntry) => {
-      const value = answerValues[templateEntry.question];
-      return toExitSurveyEntry(templateEntry, value);
-    });
+    return visibleEntries.map((entry) => toExitSurveyEntry(entry, answerValues[entry.id]));
   }
 
   async function handleUseRecording() {
@@ -104,9 +120,9 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
 
   function findFirstMissingAnswer(): string | null {
     for (const entry of visibleEntries) {
-      const value = answerValues[entry.question];
-      if (entry.type === "multi_select") continue;
-      if (entry.type === "short_answer") continue;
+      if (entry.component === "multi_select") continue; // empty selection is valid
+      if (entry.component === "short_answer") continue; // optional free text
+      const value = answerValues[entry.id];
       if (value === undefined || value === null || value === "") {
         return entry.question;
       }
@@ -134,9 +150,7 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
     setIsSubmitting(true);
     try {
       await onSubmit({
-        meetingId,
-        userId,
-        userRole: role,
+        exitSurveyId,
         answers: buildAnswersPayload(),
         signal,
         transcript: transcript.trim().length > 0 ? transcript : undefined,
@@ -154,19 +168,24 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
 
   return (
     <div className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6 text-text-primary dark:border-border dark:bg-card dark:text-text-primary">
-      <h2 className="font-heading text-xl text-text-primary dark:text-text-primary">
-        {role === "mentor" ? "Mentor exit form" : "Mentee exit form"}
-      </h2>
+      <div>
+        <h2 className="font-heading text-xl text-text-primary dark:text-text-primary">
+          {role === "mentor" ? "Mentor exit form" : "Mentee exit form"}
+        </h2>
+        {role === "mentor" && subjectFullName && (
+          <p className="text-sm text-text-muted dark:text-text-muted">About: {subjectFullName}</p>
+        )}
+      </div>
 
       {visibleEntries.length > 0 ? (
         <div className="flex flex-col gap-5">
           {visibleEntries.map((entry) => (
             <QuestionField
-              key={entry.question}
+              key={entry.id}
               entry={entry}
-              value={answerValues[entry.question]}
-              onSelect={(value) => setAnswer(entry.question, value)}
-              onToggleOption={(option) => toggleMultiSelectOption(entry.question, option)}
+              value={answerValues[entry.id]}
+              onSelect={(value) => setAnswer(entry.id, value)}
+              onToggleOption={(option) => toggleMultiSelectOption(entry.id, option)}
             />
           ))}
         </div>
@@ -217,6 +236,13 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
           )}
         </div>
 
+        {playbackUrl && (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- transient voice note, no captions to attach
+          <audio controls src={playbackUrl} className="w-full">
+            Your browser doesn&apos;t support audio playback.
+          </audio>
+        )}
+
         {(recorder.status === "denied" || recorder.status === "error") && recorder.errorMessage && (
           <p className="text-sm text-text-muted dark:text-text-muted">{recorder.errorMessage}</p>
         )}
@@ -254,35 +280,53 @@ export function ExitSurveyForm({ meetingId, userId, role, onSubmit }: ExitSurvey
   );
 }
 
+function getVisibleEntries(
+  template: ExitSurveyTemplateEntry[],
+  answerValues: Record<string, AnswerValue>
+): ExitSurveyTemplateEntry[] {
+  return template.filter((entry) => {
+    if (!entry.showIf) return true;
+    const answer = answerValues[entry.showIf.questionId];
+    if (typeof answer !== "string") return false;
+    return Array.isArray(entry.showIf.equals)
+      ? entry.showIf.equals.includes(answer)
+      : entry.showIf.equals === answer;
+  });
+}
+
 function toExitSurveyEntry(
   template: ExitSurveyTemplateEntry,
   value: AnswerValue | undefined
 ): ExitSurveyEntry {
-  switch (template.type) {
+  switch (template.component) {
     case "single_select":
       return {
-        type: "single_select",
+        id: template.id,
+        component: "single_select",
         question: template.question,
         options: template.options,
         selected: typeof value === "string" ? value : "",
       };
     case "multi_select":
       return {
-        type: "multi_select",
+        id: template.id,
+        component: "multi_select",
         question: template.question,
         options: template.options,
         selected: Array.isArray(value) ? value : [],
       };
     case "rating":
       return {
-        type: "rating",
+        id: template.id,
+        component: "rating",
         question: template.question,
         scale: template.scale,
         selected: typeof value === "number" ? value : 0,
       };
     case "short_answer":
       return {
-        type: "short_answer",
+        id: template.id,
+        component: "short_answer",
         question: template.question,
         selected: typeof value === "string" ? value : "",
       };
@@ -299,57 +343,53 @@ interface QuestionFieldProps {
 function QuestionField({ entry, value, onSelect, onToggleOption }: QuestionFieldProps) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-text-primary dark:text-text-primary">
-        {entry.question}
-        {entry.question === MENTEE_ACTION_ITEM_QUESTION && (
-          <span className="ml-1 text-xs text-text-accent dark:text-text-accent">
-            (shared with your pod if filled in)
-          </span>
-        )}
-      </span>
+      <span className="text-sm font-medium text-text-primary dark:text-text-primary">{entry.question}</span>
 
-      {entry.type === "single_select" && (
-        <div className="flex flex-wrap gap-2">
+      {/* single_select: real radio circles — visually distinct from multi_select's checkboxes */}
+      {entry.component === "single_select" && (
+        <div className="flex flex-col gap-1.5">
           {entry.options.map((option) => (
-            <button
+            <label
               key={option}
-              type="button"
-              onClick={() => onSelect(option)}
-              className={`rounded-full border px-3 py-1 text-sm dark:border-border ${
-                value === option
-                  ? "border-primary bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
-                  : "border-border bg-card-alt text-text-primary dark:bg-card-alt dark:text-text-primary"
-              }`}
+              className="flex cursor-pointer items-center gap-2 text-sm text-text-primary dark:text-text-primary"
             >
+              <input
+                type="radio"
+                name={entry.id}
+                checked={value === option}
+                onChange={() => onSelect(option)}
+                className="h-4 w-4 accent-primary"
+              />
               {option}
-            </button>
+            </label>
           ))}
         </div>
       )}
 
-      {entry.type === "multi_select" && (
-        <div className="flex flex-wrap gap-2">
+      {/* multi_select: checkboxes */}
+      {entry.component === "multi_select" && (
+        <div className="flex flex-col gap-1.5">
           {entry.options.map((option) => {
             const selected = Array.isArray(value) && value.includes(option);
             return (
-              <button
+              <label
                 key={option}
-                type="button"
-                onClick={() => onToggleOption(option)}
-                className={`rounded-full border px-3 py-1 text-sm dark:border-border ${
-                  selected
-                    ? "border-primary bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
-                    : "border-border bg-card-alt text-text-primary dark:bg-card-alt dark:text-text-primary"
-                }`}
+                className="flex cursor-pointer items-center gap-2 text-sm text-text-primary dark:text-text-primary"
               >
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => onToggleOption(option)}
+                  className="h-4 w-4 accent-primary"
+                />
                 {option}
-              </button>
+              </label>
             );
           })}
         </div>
       )}
 
-      {entry.type === "rating" && (
+      {entry.component === "rating" && (
         <div className="flex gap-1">
           {Array.from({ length: entry.scale }, (_, i) => i + 1).map((star) => (
             <button
@@ -369,7 +409,7 @@ function QuestionField({ entry, value, onSelect, onToggleOption }: QuestionField
         </div>
       )}
 
-      {entry.type === "short_answer" && (
+      {entry.component === "short_answer" && (
         <textarea
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onSelect(e.target.value)}

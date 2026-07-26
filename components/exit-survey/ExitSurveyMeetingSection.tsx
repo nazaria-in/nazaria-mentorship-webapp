@@ -3,27 +3,24 @@
 
 import { useEffect, useState } from "react";
 import { ExitSurveyForm } from "@/components/exit-survey/ExitSurveyForm";
-import {
-  getExitSurveyForMeetingAndUser,
-  submitExitSurvey,
-} from "@/lib/api/exit-surveys";
-import type { ExitSurveyRole, ExitSurveyRow, ExitSurveySubmission } from "@/types/exit-survey";
+import { getExitSurveysForMeeting, submitExitSurvey } from "@/lib/api/exit-surveys";
+import type { ExitSurveyRow, ExitSurveySubmission } from "@/types/exit-survey";
 
 interface ExitSurveyMeetingSectionProps {
   meetingId: string;
   userId: string;
-  role: ExitSurveyRole;
 }
 
 /**
- * Drop this into the meeting detail page. It's the "somewhere in the
- * meetings tab" entry point — independent of the notification nudge, so
- * someone who missed the notification can still find the form here.
+ * Drop this into the meeting detail page. Shows every exit_surveys row that
+ * belongs to the current user for this meeting — for a mentee that's one
+ * row, for a mentor with multiple mentees in the meeting that's one row
+ * per mentee (each with its own subjectUserId).
  */
-export function ExitSurveyMeetingSection({ meetingId, userId, role }: ExitSurveyMeetingSectionProps) {
-  const [existingSurvey, setExistingSurvey] = useState<ExitSurveyRow | null>(null);
+export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetingSectionProps) {
+  const [rows, setRows] = useState<ExitSurveyRow[]>([]);
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,12 +30,10 @@ export function ExitSurveyMeetingSection({ meetingId, userId, role }: ExitSurvey
       setIsLoading(true);
       setLoadError(null);
       try {
-        const survey = await getExitSurveyForMeetingAndUser(meetingId, userId);
-        if (!cancelled) setExistingSurvey(survey);
+        const allRows = await getExitSurveysForMeeting(meetingId);
+        if (!cancelled) setRows(allRows.filter((r) => r.userId === userId));
       } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : "Couldn't load exit survey status.");
-        }
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load exit surveys.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -51,9 +46,9 @@ export function ExitSurveyMeetingSection({ meetingId, userId, role }: ExitSurvey
   }, [meetingId, userId]);
 
   async function handleSubmit(submission: ExitSurveySubmission) {
-    const saved = await submitExitSurvey(submission);
-    setExistingSurvey(saved);
-    setIsFormOpen(false);
+    const updated = await submitExitSurvey(submission);
+    setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    setOpenRowId(null);
   }
 
   if (isLoading) {
@@ -72,34 +67,53 @@ export function ExitSurveyMeetingSection({ meetingId, userId, role }: ExitSurvey
     );
   }
 
-  if (existingSurvey) {
+  if (rows.length === 0) {
     return (
       <div className="surface-card dark:surface-card">
-        <p className="text-sm font-medium text-text-primary dark:text-text-primary">
-          Exit survey submitted
-        </p>
-        <p className="mt-1 text-sm text-text-muted dark:text-text-muted">
-          Signal: {existingSurvey.signal} · Submitted{" "}
-          {new Date(existingSurvey.createdAt).toLocaleString()}
-        </p>
+        <p className="text-sm text-text-muted dark:text-text-muted">No exit survey for this meeting.</p>
       </div>
     );
   }
 
-  if (!isFormOpen) {
-    return (
-      <div className="surface-card flex items-center justify-between dark:surface-card">
-        <p className="text-sm text-text-primary dark:text-text-primary">Exit survey not yet submitted.</p>
-        <button
-          type="button"
-          onClick={() => setIsFormOpen(true)}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground dark:bg-primary dark:text-primary-foreground"
-        >
-          Fill exit survey
-        </button>
-      </div>
-    );
-  }
+  return (
+    <div className="flex flex-col gap-3">
+      {rows.map((row) => {
+        if (openRowId === row.id) {
+          return (
+            <ExitSurveyForm
+              key={row.id}
+              exitSurveyId={row.id}
+              role={row.userRole}
+              templateSnapshot={row.templateSnapshot}
+              onSubmit={handleSubmit}
+            />
+          );
+        }
 
-  return <ExitSurveyForm meetingId={meetingId} userId={userId} role={role} onSubmit={handleSubmit} />;
+        return (
+          <div key={row.id} className="surface-card flex items-center justify-between dark:surface-card">
+            <div>
+              <p className="text-sm font-medium text-text-primary dark:text-text-primary">
+                {row.submittedAt ? "Exit survey submitted" : "Exit survey not yet submitted"}
+              </p>
+              {row.submittedAt && (
+                <p className="mt-1 text-xs text-text-muted dark:text-text-muted">
+                  Signal: {row.signal} · Submitted {new Date(row.submittedAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+            {!row.submittedAt && (
+              <button
+                type="button"
+                onClick={() => setOpenRowId(row.id)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground dark:bg-primary dark:text-primary-foreground"
+              >
+                Fill exit survey
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
