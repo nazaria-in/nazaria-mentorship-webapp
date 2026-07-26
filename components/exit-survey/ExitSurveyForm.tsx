@@ -237,7 +237,6 @@ const playbackUrl = useMemo(() => {
         </div>
 
         {playbackUrl && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption -- transient voice note, no captions to attach
           <audio controls src={playbackUrl} className="w-full">
             Your browser doesn&apos;t support audio playback.
           </audio>
