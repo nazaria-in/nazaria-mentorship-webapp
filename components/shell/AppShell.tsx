@@ -140,9 +140,8 @@ export function AppShell({
               <RoleSwitcher />
             </div>
             {headerExtra}
-            <button
-              type="button"
-              onClick={onOpenMessages}
+            <Link
+              href="/chat"
               className="relative flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-surface-muted dark:hover:bg-white/5"
               aria-label="Messages"
             >
@@ -150,7 +149,7 @@ export function AppShell({
               {unreadMessageCount > 0 && (
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
               )}
-            </button>
+            </Link>
             <button
               type="button"
               onClick={onOpenNotifications}
