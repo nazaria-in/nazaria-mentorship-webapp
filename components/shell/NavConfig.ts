@@ -8,6 +8,8 @@ import {
   ShieldCheck,
   Users,
   UsersRound,
+  ListChecks,
+  Settings2,
 } from "lucide-react";
 
 import type { NavItem } from "@/components/shell/AppShell";
@@ -38,6 +40,12 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       label: "Meetings",
       href: "/meetings",
       icon: CalendarDays,
+    },
+    {
+      id: "exit-surveys",
+      label: "Exit Surveys",
+      href: "/exit-survey",
+      icon: ListChecks,
     },
   ],
 
@@ -72,6 +80,12 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       href: "/meetings",
       icon: CalendarDays,
     },
+    {
+      id: "exit-surveys",
+      label: "Exit Surveys",
+      href: "/exit-survey",
+      icon: ListChecks,
+    },
   ],
 
   staff: [
@@ -104,6 +118,18 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       label: "Meetings",
       href: "/meetings",
       icon: CalendarDays,
+    },
+    {
+      id: "exit-surveys",
+      label: "Exit Surveys",
+      href: "/exit-survey",
+      icon: ListChecks,
+    },
+    {
+      id: "exit-survey-templates",
+      label: "Survey Templates",
+      href: "/admin/exit-survey-templates",
+      icon: Settings2,
     },
     {
       id: "approvals",

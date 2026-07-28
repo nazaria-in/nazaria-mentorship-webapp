@@ -4,7 +4,7 @@ import type { ExitSurveyDetail } from "@/lib/api/exit-surveys";
 
 interface ExitSurveyReportViewProps {
   detail: ExitSurveyDetail;
-  /** true = submitter viewing their own past answers (no AI triage fields shown) */
+  /** true = submitter viewing their own past answers (no AI fields shown at all) */
   redacted: boolean;
 }
 
@@ -20,6 +20,12 @@ const URGENCY_LABEL: Record<string, string> = {
   urgent: "Follow up urgently",
 };
 
+const SENTIMENT_STYLE: Record<string, string> = {
+  positive: "bg-green-500/15 text-green-700 dark:text-green-300",
+  neutral: "bg-border text-text-muted dark:text-text-muted",
+  negative: "bg-red-500/15 text-red-700 dark:text-red-300",
+};
+
 export function ExitSurveyReportView({ detail, redacted }: ExitSurveyReportViewProps) {
   return (
     <div className="flex flex-col gap-6 rounded-xl border border-border bg-card p-6 dark:border-border dark:bg-card">
@@ -32,6 +38,13 @@ export function ExitSurveyReportView({ detail, redacted }: ExitSurveyReportViewP
           {detail.userRole === "mentor" && detail.subjectFullName ? ` — about ${detail.subjectFullName}` : ""}
           {!redacted && detail.submitterFullName ? ` — filled by ${detail.submitterFullName}` : ""}
         </p>
+        {!redacted && (detail.podName || detail.mentorNames.length > 0) && (
+          <p className="text-xs text-text-muted dark:text-text-muted">
+            {detail.podName ? `Pod: ${detail.podName}` : ""}
+            {detail.podName && detail.mentorNames.length > 0 ? " · " : ""}
+            {detail.mentorNames.length > 0 ? `Mentor(s): ${detail.mentorNames.join(", ")}` : ""}
+          </p>
+        )}
         {detail.submittedAt && (
           <p className="text-xs text-text-muted dark:text-text-muted">
             Submitted {new Date(detail.submittedAt).toLocaleString()}
@@ -65,10 +78,33 @@ export function ExitSurveyReportView({ detail, redacted }: ExitSurveyReportViewP
 
       {!redacted && (
         <div className="flex flex-col gap-3 rounded-lg border border-border-strong bg-card-alt p-4 dark:border-border-strong dark:bg-card-alt">
-          <p className="text-sm font-medium text-text-primary dark:text-text-primary">Staff triage</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-text-primary dark:text-text-primary">Staff triage</p>
+            {detail.sentiment && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${SENTIMENT_STYLE[detail.sentiment]}`}
+              >
+                {detail.sentiment}
+              </span>
+            )}
+          </div>
+
+          {detail.aiHeadline && (
+            <p className="font-heading text-base text-text-primary dark:text-text-primary">
+              {detail.aiHeadline}
+            </p>
+          )}
+
+          {detail.aiKeyPoints.length > 0 && (
+            <ul className="list-disc pl-5 text-sm text-text-primary dark:text-text-primary">
+              {detail.aiKeyPoints.map((point, i) => (
+                <li key={i}>{point}</li>
+              ))}
+            </ul>
+          )}
 
           {detail.aiSummary && (
-            <p className="text-sm text-text-primary dark:text-text-primary">{detail.aiSummary}</p>
+            <p className="text-sm text-text-muted dark:text-text-muted">{detail.aiSummary}</p>
           )}
 
           <p className="text-sm text-text-muted dark:text-text-muted">

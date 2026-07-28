@@ -1,4 +1,4 @@
-// lib/supabase/admin.ts
+// /lib/supabase/admin.ts
 
 /**
  * ============================================================================
@@ -44,3 +44,12 @@ export const supabaseAdmin = createClient(
     },
   }
 );
+
+/**
+ * Helper function that returns the singleton admin client.
+ * This maintains compatibility with older files (like web-push.ts) 
+ * that expect to call createAdminClient().
+ */
+export function createAdminClient() {
+  return supabaseAdmin;
+}

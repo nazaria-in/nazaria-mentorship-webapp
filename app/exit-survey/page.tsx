@@ -14,21 +14,25 @@ export default function ExitSurveyLandingPage() {
   const { permissionLevel } = useRole();
   const [userId, setUserId] = useState<string | null>(null);
   const [role, setRole] = useState<ExitSurveyRole | null>(null);
-  const isStaff = permissionLevel === "staff";
-
-  // Derive initial loading state from `isStaff` rather than scheduling an effect update
-  const [isLoading, setIsLoading] = useState(!isStaff);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isStaff = permissionLevel === "staff";
+
   useEffect(() => {
-    // Staff members don't need to load user profile data
-    if (isStaff) return;
+    // If staff, just return early. The UI renders the staff dashboard
+    // immediately, so updating isLoading here is unnecessary and causes
+    // cascading renders.
+    if (isStaff) {
+      return;
+    }
 
     let cancelled = false;
 
     async function load() {
       setIsLoading(true);
       setError(null);
+      
       try {
         const supabase = createClient();
         const {
@@ -36,7 +40,10 @@ export default function ExitSurveyLandingPage() {
         } = await supabase.auth.getUser();
 
         if (!authUser) {
-          if (!cancelled) setError("Not logged in.");
+          if (!cancelled) {
+            setError("Not logged in.");
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -47,24 +54,34 @@ export default function ExitSurveyLandingPage() {
           .single();
 
         if (profileError || !profile) {
-          if (!cancelled) setError("Couldn't load your profile.");
+          if (!cancelled) {
+            setError("Couldn't load your profile.");
+            setIsLoading(false);
+          }
           return;
         }
 
         const userRole = profile.role as string;
         if (userRole !== "mentor" && userRole !== "mentee") {
-          if (!cancelled) setError("Exit surveys only apply to mentor/mentee accounts.");
+          if (!cancelled) {
+            setError("Exit surveys only apply to mentor/mentee accounts.");
+            setIsLoading(false);
+          }
           return;
         }
 
         if (!cancelled) {
           setUserId(authUser.id);
           setRole(userRole as ExitSurveyRole);
+          // Cleanup moved here to avoid React Compiler 'finally' errors
+          setIsLoading(false);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load.");
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load.");
+          // Cleanup moved here to avoid React Compiler 'finally' errors
+          setIsLoading(false);
+        }
       }
     }
 

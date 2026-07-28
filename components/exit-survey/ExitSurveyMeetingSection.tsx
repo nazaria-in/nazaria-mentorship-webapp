@@ -3,8 +3,9 @@
 
 import { useEffect, useState } from "react";
 import { ExitSurveyForm } from "@/components/exit-survey/ExitSurveyForm";
-import { getExitSurveysForMeeting, submitExitSurvey } from "@/lib/api/exit-surveys";
-import type { ExitSurveyRow, ExitSurveySubmission } from "@/types/exit-survey";
+import { getExitSurveysForMeetingDetailed, submitExitSurvey } from "@/lib/api/exit-surveys";
+import type { ExitSurveyDetail } from "@/lib/api/exit-surveys";
+import type { ExitSurveySubmission } from "@/types/exit-survey";
 
 interface ExitSurveyMeetingSectionProps {
   meetingId: string;
@@ -18,7 +19,7 @@ interface ExitSurveyMeetingSectionProps {
  * per mentee (each with its own subjectUserId).
  */
 export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetingSectionProps) {
-  const [rows, setRows] = useState<ExitSurveyRow[]>([]);
+  const [rows, setRows] = useState<ExitSurveyDetail[]>([]);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetin
       setIsLoading(true);
       setLoadError(null);
       try {
-        const allRows = await getExitSurveysForMeeting(meetingId);
+        const allRows = await getExitSurveysForMeetingDetailed(meetingId);
         if (!cancelled) setRows(allRows.filter((r) => r.userId === userId));
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load exit surveys.");
@@ -46,8 +47,9 @@ export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetin
   }, [meetingId, userId]);
 
   async function handleSubmit(submission: ExitSurveySubmission) {
-    const updated = await submitExitSurvey(submission);
-    setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    await submitExitSurvey(submission);
+    const allRows = await getExitSurveysForMeetingDetailed(meetingId);
+    setRows(allRows.filter((r) => r.userId === userId));
     setOpenRowId(null);
   }
 
@@ -85,6 +87,8 @@ export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetin
               exitSurveyId={row.id}
               role={row.userRole}
               templateSnapshot={row.templateSnapshot}
+              voicePromptLabel={row.voicePromptLabel}
+              subjectFullName={row.subjectFullName}
               onSubmit={handleSubmit}
             />
           );
@@ -95,6 +99,7 @@ export function ExitSurveyMeetingSection({ meetingId, userId }: ExitSurveyMeetin
             <div>
               <p className="text-sm font-medium text-text-primary dark:text-text-primary">
                 {row.submittedAt ? "Exit survey submitted" : "Exit survey not yet submitted"}
+                {row.userRole === "mentor" && row.subjectFullName ? ` — about ${row.subjectFullName}` : ""}
               </p>
               {row.submittedAt && (
                 <p className="mt-1 text-xs text-text-muted dark:text-text-muted">

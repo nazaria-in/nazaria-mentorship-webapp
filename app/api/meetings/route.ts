@@ -80,8 +80,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const admin = supabaseAdmin;
   const allUserIds = [authUser.id, ...participantIds];
 
-  // email now lives directly on public.users (see 20260716_meetings_and_email.sql)
-  // — one table select, no more per-user admin.auth.admin.getUserById calls.
   const { data: emailRows, error: emailError } = await admin
     .from("users")
     .select("id, email")
@@ -110,8 +108,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     googleEventId = event.id;
     meetLink = event.hangoutLink ?? null;
   } catch (calendarError) {
-    // Meeting still gets created without a meet link rather than blocking
-    // the whole flow on a Calendar API outage.
     console.error("[meetings] Google Calendar event creation failed", calendarError);
   }
 
@@ -160,15 +156,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Best-effort: create pending exit_surveys rows for this meeting. Failure
-  // here shouldn't fail meeting creation — logged, not thrown, since the
-  // meeting and its participants are already committed at this point.
+  // here shouldn't fail meeting creation (already committed at this point),
+  // but IS logged loudly, and warnings (e.g. "no active template") are
+  // returned in the response so the client can surface them if it wants to.
+  let exitSurveyWarnings: string[] = [];
   try {
-    await createPendingExitSurveys(meetingId, allUserIds);
+    const result = await createPendingExitSurveys(meetingId, allUserIds);
+    exitSurveyWarnings = result.warnings;
+    if (result.warnings.length > 0) {
+      console.warn("[meetings] Exit survey provisioning warnings:", result.warnings, { meetingId });
+    }
   } catch (exitSurveyError) {
-    console.error("[meetings] Failed to create pending exit surveys", exitSurveyError);
+    console.error("[meetings] Failed to create pending exit surveys", exitSurveyError, { meetingId });
+    exitSurveyWarnings = ["Exit surveys could not be created for this meeting — see server logs."];
   }
 
-  return NextResponse.json({ meeting }, { status: 201 });
+  return NextResponse.json({ meeting, exitSurveyWarnings }, { status: 201 });
 }
 
 /**
@@ -177,11 +180,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * mentee — this is what makes "mentor fills one exit survey per mentee in
  * the meeting" happen automatically. Uses whichever template is currently
  * marked active for each role; if a role has no active template yet, that
- * role's rows are simply skipped (flagged via console.warn) rather than
- * blocking meeting creation.
+ * role's rows are simply skipped and added to the warnings array.
  */
-async function createPendingExitSurveys(meetingId: string, participantIds: string[]): Promise<void> {
+async function createPendingExitSurveys(
+  meetingId: string, 
+  participantIds: string[]
+): Promise<{ warnings: string[] }> {
   const admin = supabaseAdmin;
+  const warnings: string[] = [];
 
   const { data: profiles, error: profilesError } = await admin
     .from("users")
@@ -192,7 +198,7 @@ async function createPendingExitSurveys(meetingId: string, participantIds: strin
   const mentorIds = (profiles ?? []).filter((p) => p.role === "mentor").map((p) => p.id as string);
   const menteeIds = (profiles ?? []).filter((p) => p.role === "mentee").map((p) => p.id as string);
 
-  if (mentorIds.length === 0 && menteeIds.length === 0) return;
+  if (mentorIds.length === 0 && menteeIds.length === 0) return { warnings };
 
   const { data: templates, error: templatesError } = await admin
     .from("exit_survey_templates")
@@ -204,8 +210,13 @@ async function createPendingExitSurveys(meetingId: string, participantIds: strin
   const mentorTemplate = (templates ?? []).find((t) => t.role === "mentor");
   const menteeTemplate = (templates ?? []).find((t) => t.role === "mentee");
 
-  if (!mentorTemplate) console.warn("[meetings] No active mentor exit survey template — skipping mentor rows.");
-  if (!menteeTemplate) console.warn("[meetings] No active mentee exit survey template — skipping mentee rows.");
+  if (!mentorTemplate) {
+    warnings.push("No active mentor exit survey template — skipping mentor rows.");
+  }
+  
+  if (!menteeTemplate) {
+    warnings.push("No active mentee exit survey template — skipping mentee rows.");
+  }
 
   const rows: Record<string, unknown>[] = [];
 
@@ -234,8 +245,10 @@ async function createPendingExitSurveys(meetingId: string, participantIds: strin
     }
   }
 
-  if (rows.length === 0) return;
+  if (rows.length === 0) return { warnings };
 
   const { error: insertError } = await admin.from("exit_surveys").insert(rows);
   if (insertError) throw new Error(insertError.message);
+
+  return { warnings };
 }

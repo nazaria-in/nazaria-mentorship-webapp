@@ -1,13 +1,14 @@
 // /components/exit-survey/ExitSurveyForm.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { transcribeAudio } from "@/lib/api/exit-survey-transcribe";
 import type {
   ExitSurveyConcernTag,
   ExitSurveyEntry,
   ExitSurveyRole,
+  ExitSurveySentiment,
   ExitSurveySignal,
   ExitSurveySubmission,
   ExitSurveyTemplateEntry,
@@ -20,6 +21,8 @@ interface ExitSurveyFormProps {
   templateSnapshot: ExitSurveyTemplateEntry[];
   /** Mentor forms are about a specific mentee — shown as context above the form. */
   subjectFullName?: string | null;
+  /** PM/associate-customizable label above the recorder, e.g. "Anything else about this session?" */
+  voicePromptLabel?: string | null;
   onSubmit: (submission: ExitSurveySubmission) => Promise<void>;
 }
 
@@ -32,37 +35,42 @@ export function ExitSurveyForm({
   role,
   templateSnapshot,
   subjectFullName,
+  voicePromptLabel,
   onSubmit,
 }: ExitSurveyFormProps) {
   const [answerValues, setAnswerValues] = useState<Record<string, AnswerValue>>({});
   const [signal, setSignal] = useState<ExitSurveySignal | null>(null);
   const [transcript, setTranscript] = useState<string>("");
+
+  // AI analysis is computed here and submitted, but intentionally never
+  // rendered to the person filling this out — see docs/EXIT_SURVEY_SYSTEM.md
+  // "Access rules by role." Only staff see this data (ExitSurveyReportView
+  // with redacted=false). Do not add a preview of these back into this form.
+  const [aiHeadline, setAiHeadline] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiKeyPoints, setAiKeyPoints] = useState<string[]>([]);
+  const [sentiment, setSentiment] = useState<ExitSurveySentiment | null>(null);
   const [concernTags, setConcernTags] = useState<ExitSurveyConcernTag[]>([]);
   const [needsFollowUp, setNeedsFollowUp] = useState(false);
   const [followUpUrgency, setFollowUpUrgency] = useState<ExitSurveyUrgency>("none");
+
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const recorder = useAudioRecorder();
+  const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Playback: build an object URL for whatever's currently recorded so the
-  // person can listen back before deciding to transcribe or discard it.
-const playbackUrl = useMemo(() => {
-    if (recorder.status === "stopped" && recorder.audioBlob) {
-      return URL.createObjectURL(recorder.audioBlob);
-    }
-    return null;
-  }, [recorder.status, recorder.audioBlob]);
-
+  // Sync the audio blob to the DOM element directly without causing state renders
   useEffect(() => {
-    return () => {
-      if (playbackUrl) {
-        URL.revokeObjectURL(playbackUrl);
+    if (recorder.status === "stopped" && recorder.audioBlob) {
+      const url = URL.createObjectURL(recorder.audioBlob);
+      if (audioRef.current) {
+        audioRef.current.src = url;
       }
-    };
-  }, [playbackUrl]);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [recorder.status, recorder.audioBlob]);
 
   const visibleEntries = useMemo(
     () => getVisibleEntries(templateSnapshot, answerValues),
@@ -99,20 +107,29 @@ const playbackUrl = useMemo(() => {
     if (!recorder.audioBlob) return;
     setError(null);
     setIsTranscribing(true);
+    
     try {
       const result = await transcribeAudio(recorder.audioBlob, buildAnswersPayload());
       setTranscript(result.transcript);
+      setAiHeadline(result.headline);
       setAiSummary(result.summary);
+      setAiKeyPoints(result.keyPoints);
+      setSentiment(result.sentiment);
       setConcernTags(result.concernTags);
       setNeedsFollowUp(result.needsFollowUp);
       setFollowUpUrgency(result.followUpUrgency);
+      
+      // Cleanup (replacing finally block due to React Compiler limitations)
+      setIsTranscribing(false);
+      recorder.reset();
     } catch (transcribeError) {
       setError(
         transcribeError instanceof Error
           ? transcribeError.message
           : "Couldn't transcribe that recording. Try again or type your note instead."
       );
-    } finally {
+      
+      // Cleanup (replacing finally block due to React Compiler limitations)
       setIsTranscribing(false);
       recorder.reset();
     }
@@ -120,8 +137,8 @@ const playbackUrl = useMemo(() => {
 
   function findFirstMissingAnswer(): string | null {
     for (const entry of visibleEntries) {
-      if (entry.component === "multi_select") continue; // empty selection is valid
-      if (entry.component === "short_answer") continue; // optional free text
+      if (entry.component === "multi_select") continue;
+      if (entry.component === "short_answer") continue;
       const value = answerValues[entry.id];
       if (value === undefined || value === null || value === "") {
         return entry.question;
@@ -148,20 +165,28 @@ const playbackUrl = useMemo(() => {
     }
 
     setIsSubmitting(true);
+    
     try {
       await onSubmit({
         exitSurveyId,
         answers: buildAnswersPayload(),
         signal,
         transcript: transcript.trim().length > 0 ? transcript : undefined,
+        aiHeadline: aiHeadline ?? undefined,
         aiSummary: aiSummary ?? undefined,
+        aiKeyPoints: aiKeyPoints.length > 0 ? aiKeyPoints : undefined,
+        sentiment: sentiment ?? undefined,
         concernTags: concernTags.length > 0 ? concernTags : undefined,
         needsFollowUp: needsFollowUp || undefined,
         followUpUrgency: followUpUrgency !== "none" ? followUpUrgency : undefined,
       });
+      
+      // Cleanup (replacing finally block due to React Compiler limitations)
+      setIsSubmitting(false);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to submit survey.");
-    } finally {
+      
+      // Cleanup (replacing finally block due to React Compiler limitations)
       setIsSubmitting(false);
     }
   }
@@ -197,7 +222,7 @@ const playbackUrl = useMemo(() => {
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-text-primary dark:text-text-primary">
-          Voice note {transcriptRequired ? "(required)" : "(optional)"}
+          {voicePromptLabel || "Voice note"} {transcriptRequired ? "(required)" : "(optional)"}
         </span>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -236,8 +261,9 @@ const playbackUrl = useMemo(() => {
           )}
         </div>
 
-        {playbackUrl && (
-          <audio controls src={playbackUrl} className="w-full">
+        {recorder.status === "stopped" && recorder.audioBlob && (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- transient voice note, no captions to attach
+          <audio ref={audioRef} controls className="w-full">
             Your browser doesn&apos;t support audio playback.
           </audio>
         )}
@@ -254,13 +280,8 @@ const playbackUrl = useMemo(() => {
           className="rounded-lg border border-border bg-card-alt p-2 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
         />
 
-        {aiSummary && (
-          <div className="rounded-lg bg-card-alt p-3 text-xs text-text-muted dark:bg-card-alt dark:text-text-muted">
-            <p className="mb-1 font-medium text-text-primary dark:text-text-primary">AI summary preview</p>
-            <p>{aiSummary}</p>
-            {concernTags.length > 0 && <p className="mt-1">Flagged: {concernTags.join(", ")}</p>}
-          </div>
-        )}
+        {/* Intentionally no AI summary/analysis preview here — see the
+            comment on the state declarations above. */}
       </div>
 
       <SignalPicker value={signal} onChange={setSignal} />
@@ -286,11 +307,29 @@ function getVisibleEntries(
   return template.filter((entry) => {
     if (!entry.showIf) return true;
     const answer = answerValues[entry.showIf.questionId];
-    if (typeof answer !== "string") return false;
-    return Array.isArray(entry.showIf.equals)
-      ? entry.showIf.equals.includes(answer)
-      : entry.showIf.equals === answer;
+    return evaluateShowIf(entry.showIf, answer);
   });
+}
+
+/**
+ * Parent can be single_select (answer: string), multi_select (answer:
+ * string[]), or rating (answer: number) — evaluated differently per shape.
+ * See ExitSurveyShowIf in types/exit-survey.ts for which field applies to
+ * which parent type.
+ */
+function evaluateShowIf(
+  showIf: NonNullable<ExitSurveyTemplateEntry["showIf"]>,
+  answer: AnswerValue | undefined
+): boolean {
+  if (showIf.atLeast !== undefined) {
+    return typeof answer === "number" && answer >= showIf.atLeast;
+  }
+  if (showIf.equals !== undefined) {
+    const triggers = Array.isArray(showIf.equals) ? showIf.equals : [showIf.equals];
+    if (typeof answer === "string") return triggers.includes(answer);
+    if (Array.isArray(answer)) return answer.some((a) => triggers.includes(a));
+  }
+  return false;
 }
 
 function toExitSurveyEntry(
@@ -344,7 +383,6 @@ function QuestionField({ entry, value, onSelect, onToggleOption }: QuestionField
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-text-primary dark:text-text-primary">{entry.question}</span>
 
-      {/* single_select: real radio circles — visually distinct from multi_select's checkboxes */}
       {entry.component === "single_select" && (
         <div className="flex flex-col gap-1.5">
           {entry.options.map((option) => (
@@ -365,7 +403,6 @@ function QuestionField({ entry, value, onSelect, onToggleOption }: QuestionField
         </div>
       )}
 
-      {/* multi_select: checkboxes */}
       {entry.component === "multi_select" && (
         <div className="flex flex-col gap-1.5">
           {entry.options.map((option) => {

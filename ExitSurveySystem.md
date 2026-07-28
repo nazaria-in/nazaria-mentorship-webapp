@@ -211,3 +211,104 @@ hooks/use-audio-recorder.ts               — getUserMedia + MediaRecorder wrapp
   yet — `text[]` columns don't map cleanly onto any existing `FilterFieldDef`
   kind (would need a `computed` resolver or a supporting view; skipped for
   now, tags are shown as read-only badges only).
+
+## Update log — structured AI, pod context, template editor UX, RLS
+
+This section documents a significant follow-up pass. If anything above
+contradicts this section, this section is newer.
+
+- **AI summary is no longer shown to the submitter, anywhere, including
+  during filling.** `ExitSurveyForm` used to show an "AI summary preview"
+  panel right after transcribing — that was a leak, since the redaction
+  logic in `ExitSurveyReportView` only applied to the *post-submit* read-only
+  view, not the fill flow itself. Removed. AI fields are still computed and
+  submitted, just never rendered back to mentee/mentor.
+- **AI analysis is now fully structured**: `headline` (one-liner),
+  `summary` (paragraph), `keyPoints` (string[]), `sentiment`
+  (positive/neutral/negative, new filterable column), plus the pre-existing
+  `concernTags`/`needsFollowUp`/`followUpUrgency`. One Gemini call, one
+  `responseSchema`, all fields — see `lib/google/gemini.ts`.
+- **Pod + mentor context**: `v_exit_survey_context` view resolves a survey
+  subject's pod and that pod's mentor(s), merged client-side onto
+  `ExitSurveyDetail` via `mergeContext()` in `lib/api/exit-surveys.ts`
+  (there's no direct FK path for this, hence the separate view + merge
+  rather than a single embedded select).
+- **Pod filtering** on the staff dashboard is a plain `<select>` outside
+  `SmartFilterBar`, filtering the already-fetched+merged rows — pod isn't a
+  column on `exit_surveys` itself, so it can't use `applyFilters`.
+- **Meeting-wise comparison**: `/exit-survey/meeting/[meetingId]`, staff
+  only, shows every row (pending + submitted) for one meeting side by side.
+- **Template editor rewritten**: card list instead of `<select>`, real
+  add/remove-option buttons (the old comma-separated text input actively
+  broke on typing a comma or space mid-edit — not just unpolished, genuinely
+  buggy), a `showIf` builder (pick a prior single-choice question + which
+  answer triggers this one), and a per-template `voice_prompt_label` field.
+  **State management fix**: the editor now holds a local `WorkingTemplate`
+  as the sole source of truth once a template is open, instead of deriving
+  from the react-query cache — the old version appeared to "hang" on
+  save/create because the panel rendered from cache data that hadn't
+  refetched yet.
+- **RLS enabled** on `exit_survey_templates` and `exit_surveys` for the
+  first time (migration 0006) — previously had zero policies, meaning if
+  RLS was ever toggled on at the project level, everything on these two
+  tables would have silently denied, which is a very plausible explanation
+  for both the "template save looked stuck" and "exit survey wasn't
+  created" reports. Admin/service-role client (used for meeting creation and
+  the backfill route) bypasses RLS regardless.
+- **80%-elapsed visibility gate**: `v_pending_exit_surveys` now only
+  surfaces a row once `now() >= starts_at + 0.8 * (ends_at - starts_at)`.
+  Rows still exist from meeting-creation time — this only changes when they
+  show up in the "you need to fill this in" list.
+- **Provisioning logic extracted** to `lib/server/exit-survey-provisioning.ts`
+  (`createPendingExitSurveys`), now reusable — used by both meeting creation
+  and the new manual backfill endpoint,
+  `POST /api/meetings/[meetingId]/backfill-exit-surveys` (staff only). Use
+  this to fix any meeting that ended up with zero exit survey rows; it's
+  upsert-based so it's safe to call on a meeting that already has some rows.
+- **`/exit-survey/[exitSurveyId]`** and **`/exit-survey-demo`** both updated
+  to pass `voicePromptLabel` through to `ExitSurveyForm`, and to use
+  `getExitSurveyDetailById`/`ExitSurveyDetail` instead of the older
+  `getExitSurveyById`/`ExitSurveyRow`-only fetch (which no longer exists).
+
+### Still open
+- Concern tags remain unfilterable in the dashboard (array column, no
+  matching `FilterFieldDef` kind).
+- Seeder (`scripts/seed/exitSurveyDemoSeeder.ts`) was not updated for
+  `voice_prompt_label` — harmless (defaults to null → "Voice note"), but
+  worth a pass if you want the seeded templates to exercise that field too.
+- PM/associate submitting their own survey is still unconfirmed/unbuilt.
+
+## Update log — nav wiring, richer showIf, notification handoff
+
+- **Nav wired**: `/exit-survey` now appears in `NavConfig.ts` for mentee,
+  mentor, and staff; `/admin/exit-survey-templates` for staff only. Icons:
+  `ListChecks` and `Settings2` (lucide-react). Meeting comparison
+  (`/exit-survey/meeting/[meetingId]`) is intentionally NOT in nav — it's
+  reached by clicking through from a survey/meeting context, not a
+  standalone destination.
+- **`showIf` now supports all three enumerable parent types**, not just
+  single_select:
+  - single_select parent → `equals` (exact match)
+  - multi_select parent → `equals` (answer array must include this value —
+    labeled "includes" in the editor UI)
+  - rating parent → `atLeast` (answer must be ≥ this number)
+  - short_answer parents are still not supported as triggers (free text has
+    no enumerable "the answer that triggers this")
+  - Type is now `ExitSurveyShowIf` in `types/exit-survey.ts` (`equals` and
+    `atLeast` both optional, exactly one should be set depending on parent).
+  - Runtime evaluation lives in `evaluateShowIf()` in `ExitSurveyForm.tsx`.
+  - Editor UI (`ExitSurveyTemplateEditor.tsx`) branches its "only show if"
+    controls based on the selected parent's component type.
+- **PM/associate exclusion confirmed, not changed** — `createPendingExitSurveys`
+  already only iterates mentor/mentee participant ids; pm/associate were
+  never getting rows. Added an explicit comment there so this doesn't get
+  "fixed" into existence accidentally later.
+- **Notification/reminder schedule (80% nudge, then 1h/1d/3d/1w
+  post-meeting-end reminders) is NOT implemented here** — tracked in
+  `docs/EXIT_SURVEY_NOTIFICATIONS_TODO.md`, to be picked up in a separate
+  notification-system work session. Do not build this in the exit-survey
+  context without also reading that file first, since it documents specific
+  constraints (idempotency, stop-on-submit, recipient) that matter.
+- **Full testing checklist**: `docs/EXIT_SURVEY_TESTING_CHECKLIST.md` —
+  10 sections, run in order, covers everything built across this feature's
+  entire history to date.

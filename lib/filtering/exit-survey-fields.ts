@@ -2,12 +2,13 @@
 
 import type { FilterFieldDef } from "@/lib/filtering/types";
 
-// concern_tags (text[]) isn't included here — no FilterFieldDef kind maps
-// cleanly onto an array column without a computed resolver or a supporting
-// view. See docs/EXIT_SURVEY_SYSTEM.md "Known gaps." Tags still render as
-// read-only badges in the table, just not filterable yet.
+// concern_tags (text[]) and pod (view-joined, no direct column) aren't
+// included here — no FilterFieldDef kind maps cleanly onto either without
+// a computed resolver. Pod gets its own dropdown outside SmartFilterBar in
+// ExitSurveyStaffDashboard; concern tags remain read-only badges only. See
+// docs/EXIT_SURVEY_SYSTEM.md "Known gaps."
 export const EXIT_SURVEY_STAFF_FIELD_DEFS: FilterFieldDef[] = [
-  { key: "search", kind: "text", columns: ["transcript", "ai_summary"], searchable: true },
+  { key: "search", kind: "text", columns: ["transcript", "ai_summary", "ai_headline"], searchable: true },
   {
     key: "role",
     kind: "enum",
@@ -27,6 +28,17 @@ export const EXIT_SURVEY_STAFF_FIELD_DEFS: FilterFieldDef[] = [
       { value: "green", label: "Green" },
       { value: "yellow", label: "Yellow" },
       { value: "red", label: "Red" },
+    ],
+  },
+  {
+    key: "sentiment",
+    kind: "enum",
+    label: "AI sentiment",
+    column: "sentiment",
+    options: [
+      { value: "positive", label: "Positive" },
+      { value: "neutral", label: "Neutral" },
+      { value: "negative", label: "Negative" },
     ],
   },
   {

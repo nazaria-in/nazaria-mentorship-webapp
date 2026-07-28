@@ -127,6 +127,7 @@ function renderContent(
         exitSurveyId={detail.id}
         role={detail.userRole}
         templateSnapshot={detail.templateSnapshot}
+        voicePromptLabel={detail.voicePromptLabel}
         subjectFullName={detail.userRole === "mentor" ? detail.subjectFullName : undefined}
         onSubmit={onSubmit}
       />
