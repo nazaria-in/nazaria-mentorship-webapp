@@ -14,7 +14,7 @@ import { useRole } from "@/providers/role-provider";
 // TODO(Joseph): swap for your actual current-user hook if the field name differs
 import { useSessionStore } from "@/store/session-store";
 import type { TimelineEvent } from "@/types/timeline";
-import { AppShell } from "@/components/shell/AppShell";
+
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 
 
@@ -73,7 +73,6 @@ export default function MeetingsPage(): React.JSX.Element {
   // and pass availableTypes={["meeting", "assignment"]} to <Timeline /> below.
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Meetings">
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl text-text-primary">Meetings</h1>
@@ -121,6 +120,5 @@ export default function MeetingsPage(): React.JSX.Element {
         <MeetingFormModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} currentUserId={userId} initialStartsAt={prefillStartsAt} />
       )}
     </div>
-    </AppShell>
   );
 }

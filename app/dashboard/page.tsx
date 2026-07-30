@@ -4,7 +4,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
@@ -67,7 +66,7 @@ export default function DashboardPage() {
   });
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Dashboard">
+    <>
       <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">
         <DashboardGreeting />
 
@@ -222,7 +221,7 @@ export default function DashboardPage() {
           </div>
         </TimelineElementDetailsModal>
       )}
-    </AppShell>
+    </>
   );
 }
 

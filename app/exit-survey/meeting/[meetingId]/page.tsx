@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { ExitSurveyReportView } from "@/components/exit-survey/ExitSurveyReportView";
@@ -58,16 +57,13 @@ export default function ExitSurveyMeetingComparisonPage() {
 
   if (!isStaff) {
     return (
-      <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Exit surveys">
         <div className="p-4">
           <EmptyState title="Staff only" description="This page is only available to associates and program managers." />
         </div>
-      </AppShell>
     );
   }
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Meeting exit surveys">
       <div className="p-4 md:p-6">
         {isLoading ? (
           <p className="text-sm text-text-muted dark:text-text-muted">Loading...</p>
@@ -98,6 +94,5 @@ export default function ExitSurveyMeetingComparisonPage() {
           </div>
         )}
       </div>
-    </AppShell>
   );
 }

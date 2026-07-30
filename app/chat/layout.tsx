@@ -4,7 +4,6 @@
 import { usePathname } from "next/navigation";
 import { ConversationsListPanel } from "@/components/messages/ConversationsListPanel";
 import { cn } from "@/lib/utils";
-import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 
@@ -23,7 +22,6 @@ export default function MessagesLayout({ children }: MessagesLayoutProps) {
   const activeConversationId = isThreadRoute ? pathname.split("/")[2] : undefined;
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Dashboard">
       <div className="flex h-[calc(100dvh-var(--app-shell-offset,4rem))] bg-surface dark:bg-surface">
         <div
           className={cn(
@@ -38,6 +36,5 @@ export default function MessagesLayout({ children }: MessagesLayoutProps) {
           {children}
         </div>
       </div>
-    </AppShell>
   );
 }

@@ -1,4 +1,4 @@
-// /components/assignments/AssignmentFormModal.tsx
+// components/assignments/AssignmentFormModal.tsx
 
 "use client";
 
@@ -6,10 +6,16 @@ import * as React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Modal } from "@/components/shared/Modal";
 import { AssignmentTemplateForm } from "@/components/assignments/AssignmentTemplateForm";
-import { PodMemberSelector } from "@/components/pods/PodMemberSelector";
+import { PeopleGrid } from "@/components/shared/PeopleGrid";
+import { fetchSelectablePeople } from "@/lib/api/people-picker";
 import { fetchAssignment } from "@/lib/api/assignments";
 import { dispatchAssignment, fetchAssignedMenteeRefs, removeMenteeAssignment } from "@/lib/api/mentee-assignments";
 import type { AssignmentWithSlots } from "@/types/assignments";
+import type { FilterFieldDef } from "@/lib/filtering/types";
+
+const PICKER_FIELD_DEFS: FilterFieldDef[] = [
+  { key: "search", kind: "text", columns: ["full_name"], searchable: true },
+];
 
 export interface AssignmentFormModalProps {
   open: boolean;
@@ -44,24 +50,20 @@ export function AssignmentFormModal({
     enabled: open && mode === "edit" && !!assignmentId,
   });
 
-  // Track if we have already loaded the initial roster into our local state
   const isInitialized = React.useRef(false);
 
   const { data: assignedRefs, isLoading: loadingRoster } = useQuery({
     queryKey: ["assigned-mentee-refs", assignmentId],
     queryFn: () => fetchAssignedMenteeRefs(assignmentId!),
     enabled: open && mode === "edit" && !!assignmentId && step === "roster",
-    // We can safely seed state here as soon as data arrives successfully
     select: (data) => {
       if (!isInitialized.current && mode === "edit") {
         setSelectedMenteeIds(data.map((r) => r.menteeId));
         isInitialized.current = true;
       }
       return data;
-    }
+    },
   });
-
-  // --- REMOVED THE USEEFFECT THAT WAS CAUSING THE ERROR ---
 
   const committedIds = React.useMemo(() => (assignedRefs ?? []).map((r) => r.menteeId), [assignedRefs]);
   const effectiveCommittedIds = React.useMemo(
@@ -108,7 +110,7 @@ export function AssignmentFormModal({
     setSelectedMenteeIds([]);
     setDueAt("");
     setLocallyRemovedIds(new Set());
-    isInitialized.current = false; // Reset initialization tracking flag
+    isInitialized.current = false;
   }
 
   function handleClose() {
@@ -154,20 +156,34 @@ export function AssignmentFormModal({
               type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-white/5 dark:border-white/10"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-white/5 dark:border-border"
             />
           </label>
 
           {mode === "edit" && loadingRoster ? (
             <p className="text-xs text-text-primary/50">Loading current roster…</p>
           ) : (
-            <PodMemberSelector
-              selectableRole="mentee"
-              mentorId={scopeToMentorId}
-              value={selectedMenteeIds}
-              onChange={setSelectedMenteeIds}
+            <PeopleGrid
+              fieldDefs={PICKER_FIELD_DEFS}
+              viewKey={`assignment-roster-${assignmentId ?? "new"}`}
+              queryKey={["selectable-mentees", scopeToMentorId ?? "all"]}
+              queryFn={(filterState) =>
+                fetchSelectablePeople({ role: "mentee", mentorId: scopeToMentorId }, filterState.search)
+              }
+              groupBy="pod"
+              groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No pod"}
+              selectable
+              selectedIds={selectedMenteeIds}
+              onSelectionChange={setSelectedMenteeIds}
               alreadyCommittedIds={mode === "edit" ? effectiveCommittedIds : undefined}
               onRemoveCommitted={mode === "edit" ? handleRemoveCommitted : undefined}
+              removalWarningTitle="Remove from this assignment?"
+              removalWarningDescription={(names) =>
+                `This assignment has already been assigned to ${names.join(", ")}. Do you wish to remove ${
+                  names.length > 1 ? "them" : "this mentee"
+                } from the assignment list? This can't be undone.`
+              }
+              emptyMessage="No pods with mentees found."
             />
           )}
 

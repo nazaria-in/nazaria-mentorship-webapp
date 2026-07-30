@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { ExitSurveyPendingList } from "@/components/exit-survey/ExitSurveyPendingList";
@@ -92,7 +91,6 @@ export default function ExitSurveyLandingPage() {
   }, [isStaff]);
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Exit surveys">
       <div className="p-4 md:p-6">
         {isStaff ? (
           <ExitSurveyStaffDashboard />
@@ -104,6 +102,5 @@ export default function ExitSurveyLandingPage() {
           <ExitSurveyPendingList userId={userId} role={role} />
         ) : null}
       </div>
-    </AppShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { fetchPodMemberGroups } from "@/lib/api/pods";
+import { cancelMeetingRemindersForParticipant } from "@/lib/notifications/meeting-notifications";
 import type { UserRole } from "@/types/users";
 import type {
   Meeting,
@@ -142,8 +143,11 @@ export async function fetchMeetingById(meetingId: string): Promise<MeetingWithPa
 }
 
 /**
- * Accept or decline a pending invite. Pure client-side — RSVP state lives
- * only in our own participants table, no Google Calendar call needed here.
+ * Accept or decline a pending invite by participant row id. Pure
+ * client-side RSVP — no notification side effects here, since callers
+ * that already have a participantId in hand may not have a meetingId
+ * loaded. Use respondToMeetingInvite below when you have meetingId
+ * instead (e.g. from a notification card, which only carries meeting_id).
  */
 export async function updateParticipantStatus(
   participantId: string,
@@ -160,6 +164,47 @@ export async function updateParticipantStatus(
 
   if (error) throw error;
   return data as MeetingParticipant;
+}
+
+/**
+ * Preferred entry point when you only have a meeting_id + the current
+ * user (this is what notification cards have — a meeting_invite
+ * notification carries meeting_id, not the participant row id). Resolves
+ * the participant row, updates status, and — on decline — cancels that
+ * user's pending reminder cascade for this meeting.
+ */
+export async function respondToMeetingInvite(
+  meetingId: string,
+  status: Extract<ParticipantStatus, "accepted" | "declined">,
+): Promise<MeetingParticipant> {
+  const supabase = createClient();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("Not authenticated.");
+
+  const { data: participant, error: participantError } = await supabase
+    .from("meeting_participants")
+    .select("id")
+    .eq("meeting_id", meetingId)
+    .eq("user_id", userData.user.id)
+    .single();
+
+  if (participantError || !participant) {
+    throw new Error(participantError?.message ?? "Participant record not found for this meeting.");
+  }
+
+  const updated = await updateParticipantStatus(participant.id as string, status);
+
+  if (status === "declined") {
+    try {
+      await cancelMeetingRemindersForParticipant(supabase, meetingId, userData.user.id);
+    } catch (notificationError) {
+      console.error("[meetings] Failed to cancel reminders on decline", notificationError);
+    }
+  }
+
+  return updated;
 }
 
 /**

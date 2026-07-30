@@ -5,7 +5,6 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { AppShell } from "@/components/shell/AppShell";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
@@ -137,7 +136,7 @@ export default function ResourcesListPage() {
   const list = resources ?? [];
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Resources & courses">
+    <>
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <SmartFilterBar fieldDefs={fieldDefs} state={filterState} className="sm:max-w-2xl" />
@@ -190,6 +189,6 @@ export default function ResourcesListPage() {
           onSaved={() => setFormModal(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }

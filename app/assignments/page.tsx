@@ -80,7 +80,6 @@ export default function AssignmentsListPage() {
     });
 
     return (
-      <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Assignments">
         <div className="flex flex-col gap-4 p-4">
           <SearchInput value={globalSearch} onChange={setGlobalSearch} placeholder="Search assignments…" />
           {isLoading ? (
@@ -95,7 +94,6 @@ export default function AssignmentsListPage() {
             </div>
           )}
         </div>
-      </AppShell>
     );
   }
 
@@ -123,7 +121,7 @@ export default function AssignmentsListPage() {
   }
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Assignments">
+    <>
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchInput value={globalSearch} onChange={setGlobalSearch} placeholder="Search all assignments…" className="sm:max-w-sm" />
@@ -175,7 +173,7 @@ export default function AssignmentsListPage() {
           }}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

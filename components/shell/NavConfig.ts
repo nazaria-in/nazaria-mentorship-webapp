@@ -62,12 +62,6 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       icon: ClipboardCheck,
     },
     {
-      id: "pod",
-      label: "My Pod",
-      href: "/pod",
-      icon: UsersRound,
-    },
-    {
       id: "resources",
       label: "Resources",
       href: "/resources",

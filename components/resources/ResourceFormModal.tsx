@@ -1,13 +1,19 @@
-// /components/resources/ResourceFormModal.tsx
+// components/resources/ResourceFormModal.tsx
 
 "use client";
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/shared/Modal";
-import { PodMemberSelector } from "@/components/pods/PodMemberSelector";
+import { PeopleGrid } from "@/components/shared/PeopleGrid";
+import { fetchSelectablePeople } from "@/lib/api/people-picker";
 import { ResourceTemplateForm, type ResourceDraft } from "@/components/resources/ResourceTemplateForm";
 import { createResources, fetchResource, insertFileRecords, linkFilesToResource, updateResource } from "@/lib/api/resources";
+import type { FilterFieldDef } from "@/lib/filtering/types";
+
+const PICKER_FIELD_DEFS: FilterFieldDef[] = [
+  { key: "search", kind: "text", columns: ["full_name"], searchable: true },
+];
 
 interface ResourceFormModalProps {
   open: boolean;
@@ -29,16 +35,14 @@ export function ResourceFormModal({ open, onClose, mode, resourceId, currentUser
 
   const needsRoster = mode === "create" && creatorRole !== "mentee";
 
-const { data: existingResource, isLoading: loadingResource } = useQuery({
-  queryKey: ["resource", resourceId],
-  queryFn: async () => {
-    if (!resourceId) {
-      throw new Error("Missing resource ID");
-    }
-    return fetchResource(resourceId);
-  },
-  enabled: open && mode === "edit" && !!resourceId,
-});
+  const { data: existingResource, isLoading: loadingResource } = useQuery({
+    queryKey: ["resource", resourceId],
+    queryFn: async () => {
+      if (!resourceId) throw new Error("Missing resource ID");
+      return fetchResource(resourceId);
+    },
+    enabled: open && mode === "edit" && !!resourceId,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -98,7 +102,6 @@ const { data: existingResource, isLoading: loadingResource } = useQuery({
     if (needsRoster) {
       setStep("roster");
     } else {
-      // mentee self-assign, or editing an existing single row — nothing more to collect.
       saveMutation.mutate();
     }
   }
@@ -123,7 +126,6 @@ const { data: existingResource, isLoading: loadingResource } = useQuery({
         loadingResource && mode === "edit" ? (
           <p className="p-4 text-sm text-text-primary/50">Loading resource…</p>
         ) : (
-        
           <ResourceTemplateForm
             menteeId={currentUserId}
             resourceId={resourceId}
@@ -136,7 +138,20 @@ const { data: existingResource, isLoading: loadingResource } = useQuery({
         )
       ) : (
         <div className="flex flex-col gap-5">
-          <PodMemberSelector selectableRole="mentee" mentorId={scopeToMentorId} value={selectedMenteeIds} onChange={setSelectedMenteeIds} />
+          <PeopleGrid
+            fieldDefs={PICKER_FIELD_DEFS}
+            viewKey={`resource-roster-${resourceId ?? "new"}`}
+            queryKey={["selectable-mentees", scopeToMentorId ?? "all"]}
+            queryFn={(filterState) =>
+              fetchSelectablePeople({ role: "mentee", mentorId: scopeToMentorId }, filterState.search)
+            }
+            groupBy="pod"
+            groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No pod"}
+            selectable
+            selectedIds={selectedMenteeIds}
+            onSelectionChange={setSelectedMenteeIds}
+            emptyMessage="No pods with mentees found."
+          />
 
           {saveMutation.isError && (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive dark:bg-destructive/15">

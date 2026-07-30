@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { AppShell } from "@/components/shell/AppShell";
+
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { ExitSurveyForm } from "@/components/exit-survey/ExitSurveyForm";
@@ -70,7 +70,6 @@ export default function ExitSurveyDetailPage() {
   }
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle="Exit survey">
       <div className="mx-auto max-w-2xl p-4 md:p-6">
         {isLoading ? (
           <p className="text-sm text-text-muted dark:text-text-muted">Loading...</p>
@@ -80,7 +79,6 @@ export default function ExitSurveyDetailPage() {
           renderContent(detail, currentUserId, isStaff, handleSubmit)
         )}
       </div>
-    </AppShell>
   );
 }
 

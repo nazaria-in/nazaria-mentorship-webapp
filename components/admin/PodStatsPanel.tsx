@@ -1,8 +1,6 @@
 // components/admin/PodStatsPanel.tsx
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getPodStats } from "@/lib/api/org-stats";
 import type { PodStats } from "@/types/admin";
 
 function completionPct(row: PodStats): string {
@@ -10,26 +8,21 @@ function completionPct(row: PodStats): string {
   return `${Math.round((row.completed_assignments / row.total_assignments) * 100)}%`;
 }
 
-export function PodStatsPanel() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["pod-stats"],
-    queryFn: getPodStats,
-  });
+export interface PodStatsPanelProps {
+  data: PodStats[];
+  isLoading: boolean;
+  error: boolean;
+}
 
+export function PodStatsPanel({ data, isLoading, error }: PodStatsPanelProps) {
   if (isLoading) {
     return <p className="text-sm text-text-muted dark:text-text-muted">Loading pod stats…</p>;
   }
-
   if (error) {
-    return (
-      <p className="text-sm text-destructive dark:text-destructive">
-        Couldn&apos;t load pod stats.
-      </p>
-    );
+    return <p className="text-sm text-destructive dark:text-destructive">Couldn&apos;t load pod stats.</p>;
   }
-
-  if (!data || data.length === 0) {
-    return <p className="text-sm text-text-muted dark:text-text-muted">No pods yet.</p>;
+  if (data.length === 0) {
+    return <p className="text-sm text-text-muted dark:text-text-muted">No pods to show.</p>;
   }
 
   return (
@@ -55,25 +48,15 @@ export function PodStatsPanel() {
                     : "bg-card border-b border-border dark:bg-card dark:border-border"
                 }
               >
-                <td className="py-2 pr-4 font-medium text-text-primary dark:text-text-primary">
-                  {row.pod_name}
-                </td>
+                <td className="py-2 pr-4 font-medium text-text-primary dark:text-text-primary">{row.pod_name}</td>
                 <td className="py-2 pr-4 text-text-primary dark:text-text-primary">
                   {row.mentor_count} mentors · {row.mentee_count} mentees
                 </td>
                 <td className="py-2 pr-4 text-text-primary dark:text-text-primary">
                   {completionPct(row)}
-                  {row.total_assignments === 0 && (
-                    <span className="text-text-muted dark:text-text-muted"> (none yet)</span>
-                  )}
+                  {row.total_assignments === 0 && <span className="text-text-muted dark:text-text-muted"> (none yet)</span>}
                 </td>
-                <td
-                  className={
-                    hasEscalations
-                      ? "py-2 pr-4 font-semibold text-text-accent dark:text-text-accent"
-                      : "py-2 pr-4 text-text-primary dark:text-text-primary"
-                  }
-                >
+                <td className={hasEscalations ? "py-2 pr-4 font-semibold text-text-accent dark:text-text-accent" : "py-2 pr-4 text-text-primary dark:text-text-primary"}>
                   {row.open_escalations}
                 </td>
               </tr>

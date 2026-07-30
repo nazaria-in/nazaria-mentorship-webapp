@@ -150,17 +150,16 @@ export function AppShell({
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
               )}
             </Link>
-            <button
-              type="button"
-              onClick={onOpenNotifications}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-surface-muted dark:hover:bg-white/5"
-              aria-label="Notifications"
-            >
-              <BellIcon />
-              {unreadNotifCount > 0 && (
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
-              )}
-            </button>
+<Link
+  href="/notifications"
+  className="relative flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-surface-muted dark:hover:bg-white/5"
+  aria-label="Notifications"
+>
+  <BellIcon />
+  {unreadNotifCount > 0 && (
+    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
+  )}
+</Link>
             <span className="md:hidden">{avatar}</span>
           </div>
         </header>
