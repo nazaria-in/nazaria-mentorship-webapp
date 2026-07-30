@@ -6,7 +6,6 @@ import {
   LayoutGrid,
   BookOpen,
   ShieldCheck,
-  Users,
   UsersRound,
   ListChecks,
   Settings2,
@@ -102,12 +101,6 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       icon: ClipboardCheck,
     },
     {
-      id: "cohorts",
-      label: "Cohorts",
-      href: "/admin/cohorts",
-      icon: Users,
-    },
-    {
       id: "resources",
       label: "Resources",
       href: "/resources",
@@ -131,9 +124,14 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
       href: "/admin/exit-survey-templates",
       icon: Settings2,
     },
+    // Was "Approvals" pointing at the same /admin/users route — that page
+    // now hosts Approvals + Roles + Pods + Cohorts as tabs, so it's
+    // relabeled to reflect that. The old standalone "Cohorts" item
+    // (-> /admin/cohorts, a page that never existed) is removed; cohorts
+    // now live inside this page as a tab instead.
     {
-      id: "approvals",
-      label: "Approvals",
+      id: "people",
+      label: "People",
       href: "/admin/users",
       icon: ShieldCheck,
     },
