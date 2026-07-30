@@ -11,6 +11,8 @@ import { Moon, Sun, MoreHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
 import { useRole } from "@/providers/role-provider";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { useSessionStore } from "@/store/session-store";
 
 export interface NavItem {
   id: string;
@@ -64,6 +66,9 @@ export function AppShell({
   const mobileVisible = overflow ? navItems.slice(0, MOBILE_VISIBLE_LIMIT - 1) : navItems;
   const mobileOverflowItems = overflow ? navItems.slice(MOBILE_VISIBLE_LIMIT - 1) : [];
   const overflowHasActive = mobileOverflowItems.some((item) => pathname?.startsWith(item.href));
+
+  const UserId = useSessionStore((s) => s.userId) || "no";
+  
 
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
@@ -144,14 +149,14 @@ export function AppShell({
               <MessageIcon />
               {unreadMessageCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />}
             </Link>
-            <Link
-              href="/notifications"
+            <div
+              
               className="relative flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-surface-muted dark:hover:bg-white/5"
               aria-label="Notifications"
             >
-              <BellIcon />
+              <NotificationBell userId={UserId}/>
               {unreadNotifCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />}
-            </Link>
+            </div>
             <span className="md:hidden">{avatar}</span>
           </div>
         </header>
