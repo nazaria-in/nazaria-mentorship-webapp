@@ -18,12 +18,18 @@ export function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { permissionLevel } = useRole();
 
-  const skipShell = NO_SHELL_PREFIXES.some((p) => pathname?.startsWith(p));
+  // Strip trailing slash except for root itself
+  const normalizedPathname = pathname && pathname !== "/" && pathname.endsWith("/") 
+    ? pathname.slice(0, -1) 
+    : pathname;
+
+  const isIndexPage = normalizedPathname === "/";
+  const skipShell = isIndexPage || NO_SHELL_PREFIXES.some((p) => normalizedPathname?.startsWith(p));
 
   if (skipShell) return <>{children}</>;
 
   return (
-    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle={titleFromPath(pathname ?? "")}>
+    <AppShell navItems={NAV_BY_PERMISSION[permissionLevel]} pageTitle={titleFromPath(normalizedPathname ?? "")}>
       {children}
     </AppShell>
   );

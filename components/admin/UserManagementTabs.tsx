@@ -1,23 +1,19 @@
-// /components/admin/UserManagementTabs.tsx
+// components/admin/UserManagementTabs.tsx
 "use client";
 
-import { Suspense, useState } from "react";
-import { PendingApprovalsList } from "@/components/admin/PendingApprovalsList";
-import { UserRolesTab } from "@/components/admin/UserRolesTab";
-import { UserPodsTab } from "@/components/admin/UserPodsTab";
+import { useState } from "react";
 import { CohortsTab } from "@/components/admin/CohortsTab";
+import { PeopleTab } from "@/components/admin/PeopleTab";
 
-type Tab = "approvals" | "roles" | "pods" | "cohorts";
+type Tab = "roles" | "cohorts";
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: "approvals", label: "Approvals" },
   { value: "roles", label: "Roles" },
-  { value: "pods", label: "Pods" },
   { value: "cohorts", label: "Cohorts" },
 ];
 
 export function UserManagementTabs() {
-  const [activeTab, setActiveTab] = useState<Tab>("approvals");
+  const [activeTab, setActiveTab] = useState<Tab>("roles");
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -38,17 +34,8 @@ export function UserManagementTabs() {
         ))}
       </div>
 
-      {activeTab === "approvals" && <PendingApprovalsList />}
-      {activeTab === "roles" && <UserRolesTab />}
-      {activeTab === "pods" && <UserPodsTab />}
-      {activeTab === "cohorts" && (
-        // CohortsTab renders UserProfileSheet, which reads the `?user=`
-        // search param — needs a Suspense boundary per Next.js app router
-        // rules for useSearchParams.
-        <Suspense fallback={<p className="text-sm text-text-muted dark:text-text-muted">Loading…</p>}>
-          <CohortsTab />
-        </Suspense>
-      )}
+      {activeTab === "roles" && <PeopleTab />}
+      {activeTab === "cohorts" && <CohortsTab />}
     </div>
   );
 }

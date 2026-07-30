@@ -32,6 +32,11 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
   // Lock editing if the assignment has already started
   const hasStarted = mode === "edit" && !!initialValues && initialValues.start_date <= new Date().toISOString().slice(0, 10);
 
+  const isDateRangeValid = React.useMemo(() => {
+    if (!startDate || !endDate) return true; // end date is optional; nothing to compare until both are set
+    return endDate >= startDate; // yyyy-MM-dd strings compare correctly lexicographically
+  }, [startDate, endDate]);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (mode === "create") {
@@ -60,7 +65,13 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
     onSuccess: (result) => onSaved(result),
   });
 
-  const canSubmit = title.trim() && description.trim() && startDate && slots.length > 0 && slots.every((s) => s.title.trim());
+  const canSubmit =
+    !!title.trim() &&
+    !!description.trim() &&
+    !!startDate &&
+    isDateRangeValid &&
+    slots.length > 0 &&
+    slots.every((s) => s.title.trim());
 
   return (
     <form
@@ -114,7 +125,12 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setStartDate(next);
+              // keep due date in sync if it's now before the new start date
+              setEndDate((prevEnd) => (prevEnd && prevEnd < next ? next : prevEnd));
+            }}
             disabled={hasStarted}
             className={inputClass}
           />
@@ -125,10 +141,16 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             disabled={hasStarted}
-            className={inputClass}
+            min={startDate || undefined}
+            aria-invalid={!isDateRangeValid}
+            className={`${inputClass} aria-[invalid=true]:border-destructive aria-[invalid=true]:focus:border-destructive`}
           />
         </Field>
       </div>
+
+      {!isDateRangeValid && (
+        <p className="-mt-3 text-xs font-medium text-destructive">Due date can&apos;t be before the start date.</p>
+      )}
 
       <Field label="Week number" optional>
         <input

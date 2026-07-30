@@ -37,23 +37,12 @@ export async function getEscalations(scope?: AdminScope | null): Promise<Escalat
   });
 }
 
-/**
- * "Reviewed" isn't a separate column — it's just clearing the existing
- * needs_follow_up flag (and urgency, since there's nothing left to follow
- * up on). No new columns, reuses what's already there.
- *
- * LIMITATION: v_escalations also includes rows purely because signal =
- * 'red', independent of needs_follow_up. This function does NOT touch
- * signal — clearing it would falsify the record. A red-signal survey with
- * needs_follow_up already false will still show up in the feed after
- * calling this. Dismissing that case cleanly needs a new column (e.g.
- * reviewed_at) — flagging, not solving here.
- */
+
 export async function markEscalationReviewed(exitSurveyId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("exit_surveys")
-    .update({ needs_follow_up: false, follow_up_urgency: "none" })
+    .update({ reviewed_at: new Date().toISOString() })
     .eq("id", exitSurveyId);
 
   if (error) throw error;

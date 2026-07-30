@@ -1,7 +1,6 @@
 // components/admin/PeopleTab.tsx
 "use client";
-
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchUsersByApproval, updateApprovalStatus } from "@/lib/api/users";
 import {
@@ -105,6 +104,18 @@ function ApprovedRoster() {
 
   const { data: podOptions } = useQuery({ queryKey: ["pod-options"], queryFn: fetchPodOptions });
 
+  // Pod options are runtime data (vary by cohort) — USER_POD_FIELD_DEFS
+  // ships with an empty options: [] placeholder for the pod field, same
+  // pattern as the old UserPodsTab. Without this splice the pod filter
+  // renders with nothing to select, which is the bug being fixed here.
+  const fieldDefs = useMemo(
+    () =>
+      USER_POD_FIELD_DEFS.map((field) =>
+        field.key === "pod" ? { ...field, options: podOptions ?? [] } : field
+      ),
+    [podOptions]
+  );
+
   async function handleRoleChange(userId: string, role: UserRole) {
     await updateUserRole(userId, role);
     queryClient.invalidateQueries({ queryKey: ["people-approved"] });
@@ -127,14 +138,19 @@ function ApprovedRoster() {
         <button
           type="button"
           onClick={() => setGrouped((g) => !g)}
-          className="text-xs text-text-accent hover:underline dark:text-text-accent"
+          aria-pressed={grouped}
+          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            grouped
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-transparent text-text-primary hover:bg-surface-muted dark:border-border dark:text-text-primary dark:hover:bg-white/5"
+          }`}
         >
           {grouped ? "Ungroup" : "Group by pod"}
         </button>
       </div>
 
       <PeopleGrid
-        fieldDefs={USER_POD_FIELD_DEFS}
+        fieldDefs={fieldDefs}
         viewKey="admin-people-approved"
         queryKey={["people-approved"]}
         groupBy={grouped ? "pod" : "none"}
@@ -144,38 +160,37 @@ function ApprovedRoster() {
           return rows.filter((r) => r.approvalStatus === "approved").map(podRowToPerson);
         }}
         computeClickable={(p) => p.role === "mentor" || p.role === "mentee"}
-
-renderActions={(p) => {
-  const podRow = p as UserCardPerson & { podId: string | null; podName: string | null };
-  return (
-    <>
-      <select
-        value={p.role}
-        disabled={!isPm}
-        onChange={(e) => handleRoleChange(p.id, e.target.value as UserRole)}
-        className="rounded-lg border border-border bg-card-alt px-2 py-1 text-xs text-text-primary disabled:opacity-60 dark:border-border dark:bg-card-alt dark:text-text-primary"
-      >
-        {ROLE_OPTIONS.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
-      <select
-        value={podRow.podId ?? UNASSIGNED_VALUE}
-        onChange={(e) => handlePodChange(p.id, e.target.value)}
-        className="rounded-lg border border-border bg-card-alt px-2 py-1 text-xs text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
-      >
-        <option value={UNASSIGNED_VALUE}>No pod</option>
-        {(podOptions ?? []).map((pod) => (
-          <option key={pod.value} value={pod.value}>
-            {pod.label}
-          </option>
-        ))}
-      </select>
-    </>
-  );
-}}
+        renderActions={(p) => {
+          const podRow = p as UserCardPerson & { podId: string | null; podName: string | null };
+          return (
+            <>
+              <select
+                value={p.role}
+                disabled={!isPm}
+                onChange={(e) => handleRoleChange(p.id, e.target.value as UserRole)}
+                className="rounded-lg border border-border bg-card-alt px-2 py-1 text-xs text-text-primary disabled:opacity-60 dark:border-border dark:bg-card-alt dark:text-text-primary"
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={podRow.podId ?? UNASSIGNED_VALUE}
+                onChange={(e) => handlePodChange(p.id, e.target.value)}
+                className="rounded-lg border border-border bg-card-alt px-2 py-1 text-xs text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
+              >
+                <option value={UNASSIGNED_VALUE}>No pod</option>
+                {(podOptions ?? []).map((pod) => (
+                  <option key={pod.value} value={pod.value}>
+                    {pod.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          );
+        }}
       />
 
       {!isPm && (
@@ -186,7 +201,6 @@ renderActions={(p) => {
     </section>
   );
 }
-
 export function PeopleTab() {
   return (
     <div className="flex flex-col gap-8">
@@ -196,11 +210,51 @@ export function PeopleTab() {
         roles={["associate", "pm"]}
       />
       <PendingSection
-        title="Pending — Mentor / Mentee requests"
-        emptyMessage="No pending mentor or mentee requests."
-        roles={["mentor", "mentee"]}
+        title="Pending — Mentor requests"
+        emptyMessage="No pending mentor requests."
+        roles={["mentor"]}
       />
+      <RejectedSection />
       <ApprovedRoster />
     </div>
+  );
+}
+
+function RejectedSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["people-rejected"],
+    queryFn: () => fetchUsersByApproval({ status: "rejected" }),
+  });
+
+  async function handleReconsider(userId: string) {
+    await updateApprovalStatus(userId, "pending");
+    queryClient.invalidateQueries({ queryKey: ["people-rejected"] });
+    queryClient.invalidateQueries({ queryKey: ["people-pending"] });
+  }
+
+  const rejected = data ?? [];
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold text-text-primary dark:text-text-primary">Rejected</h3>
+      {isLoading && <p className="text-sm text-text-muted dark:text-text-muted">Loading…</p>}
+      {!isLoading && rejected.length === 0 && (
+        <p className="text-sm text-text-muted dark:text-text-muted">No rejected requests.</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {rejected.map((user) => (
+          <UserCard key={user.id} person={toPerson(user)} view="list" clickable={false}>
+            <button
+              type="button"
+              onClick={() => handleReconsider(user.id)}
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-muted dark:border-border dark:text-text-primary dark:hover:bg-white/5"
+            >
+              Move back to pending
+            </button>
+          </UserCard>
+        ))}
+      </div>
+    </section>
   );
 }

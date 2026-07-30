@@ -3,11 +3,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/api/auth";
 import { getPasswordStrength, passwordsMatch } from "@/lib/validations/password";
 
 import { PasswordStrengthMeter } from "./password-strength-meter";
-import { VerifyEmailCard } from "./verify-email-card";
 import { PasswordInput } from "./passwordInput";
 import { PasswordMismatchHint } from "./PasswordMismatchHint";
 
@@ -15,13 +15,14 @@ const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-white/5 dark:border-white/10";
 
 export function SignupForm() {
+  const router = useRouter();
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const { isValid: passwordValid } = getPasswordStrength(password);
   const matchOk = passwordsMatch(password, confirmPassword);
@@ -47,16 +48,11 @@ export function SignupForm() {
         password,
       });
 
-      setSubmittedEmail(email.trim());
+      router.push("/onboarding/role");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
-    } finally {
       setSubmitting(false);
     }
-  }
-
-  if (submittedEmail) {
-    return <VerifyEmailCard email={submittedEmail} />;
   }
 
   return (

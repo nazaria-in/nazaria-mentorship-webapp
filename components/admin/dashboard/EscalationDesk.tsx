@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { UserCard, type UserCardPerson } from "@/components/shared/UserCard";
 import type { Escalation } from "@/types/admin";
 
@@ -12,7 +13,7 @@ export interface EscalationDeskProps {
   onMarkReviewed: (exitSurveyId: string) => void;
 }
 
-const GROUP_ORDER: { key: Escalation["follow_up_urgency"] | "flagged"; label: string }[] = [
+const GROUP_ORDER: { key: "urgent" | "soon" | "flagged"; label: string }[] = [
   { key: "urgent", label: "Urgent" },
   { key: "soon", label: "Needs follow-up soon" },
   { key: "flagged", label: "Flagged" },
@@ -24,7 +25,7 @@ export function EscalationDesk({ escalations, subjects, isLoading, onMarkReviewe
     for (const e of escalations) {
       if (e.follow_up_urgency === "urgent") buckets.urgent.push(e);
       else if (e.follow_up_urgency === "soon") buckets.soon.push(e);
-      else buckets.flagged.push(e); // needs_follow_up or signal=red with urgency "none"
+      else buckets.flagged.push(e);
     }
     return buckets;
   }, [escalations]);
@@ -42,7 +43,7 @@ export function EscalationDesk({ escalations, subjects, isLoading, onMarkReviewe
   }
 
   return (
-    <div className="flex flex-col bg-gray-100 p-4 rounded-xl gap-5">
+    <div className="flex flex-col gap-5">
       {GROUP_ORDER.map(({ key, label }) => {
         const items = groups[key];
         if (items.length === 0) return null;
@@ -58,13 +59,23 @@ export function EscalationDesk({ escalations, subjects, isLoading, onMarkReviewe
                 return (
                   <div key={e.exit_survey_id} className="space-y-2">
                     <UserCard person={subject} view="card" clickable={subject.role === "mentor" || subject.role === "mentee"} />
-                    <button
-                      type="button"
-                      onClick={() => onMarkReviewed(e.exit_survey_id)}
-                      className="text-xs text-text-accent hover:underline dark:text-text-accent"
-                    >
-                      Mark reviewed
-                    </button>
+                    <div className="flex items-center gap-3">
+ <div className="flex items-center gap-2">
+  <Link
+    href={`/exit-survey/${e.exit_survey_id}`}
+    className="inline-flex items-center justify-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+  >
+    View exit survey
+  </Link>
+  <button
+    type="button"
+    onClick={() => onMarkReviewed(e.exit_survey_id)}
+    className="inline-flex items-center justify-center rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+  >
+    Mark reviewed
+  </button>
+</div>
+                    </div>
                   </div>
                 );
               })}

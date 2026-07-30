@@ -35,6 +35,11 @@ export interface PodOption {
   label: string;
 }
 
+export interface PodFirstMentor {
+  podId: string;
+  mentorId: string;
+}
+
 export async function fetchUsersForRolesTab(
   filterState: FilterState,
   sortState: SortState
@@ -232,4 +237,27 @@ export async function removeUserFromPod(userId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("pod_members").delete().eq("user_id", userId);
   if (error) throw new Error(error.message);
+}
+
+/** One mentor id per pod (first found) — used to make pod rows on the
+ *  dashboard link somewhere sensible, since a pod itself has no detail
+ *  page and PodStats carries no mentor id. */
+export async function fetchPodFirstMentors(): Promise<PodFirstMentor[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("v_user_pods")
+    .select("pod_id, user_id")
+    .eq("role", "mentor")
+    .not("pod_id", "is", null);
+
+  if (error) throw new Error(error.message);
+
+  const seen = new Set<string>();
+  const result: PodFirstMentor[] = [];
+  for (const row of (data ?? []) as { pod_id: string; user_id: string }[]) {
+    if (seen.has(row.pod_id)) continue;
+    seen.add(row.pod_id);
+    result.push({ podId: row.pod_id, mentorId: row.user_id });
+  }
+  return result;
 }

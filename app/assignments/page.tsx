@@ -5,8 +5,6 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
-import { AppShell } from "@/components/shell/AppShell";
-import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
