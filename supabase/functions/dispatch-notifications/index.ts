@@ -38,10 +38,12 @@ interface SubscriptionRow {
   p256dh: string;
   auth: string;
 }
-
+const expected = Deno.env.get("SUPABASE_SECRET_KEYS") ?? "";
+console.log("expected length:", expected.length, "| got length:", authHeader?.length ?? -1);
+console.log("expected last 6:", expected.slice(-6), "| got last 6:", authHeader?.slice(-6));
 Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${Deno.env.get("CRON_SECRET")}`) {
+  if (authHeader !== `Bearer ${Deno.env.get("SUPABASE_SECRET_KEYS")}`) {
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
   }
 

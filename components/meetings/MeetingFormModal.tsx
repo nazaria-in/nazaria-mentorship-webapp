@@ -131,7 +131,34 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {/* ...title, description fields unchanged... */}
+       <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-text-primary" htmlFor="meeting-title">
+          Title
+        </label>
+        <input
+          id="meeting-title"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          placeholder="e.g. Weekly check-in"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary dark:bg-white/5 dark:border-border dark:text-text-primary"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-text-primary" htmlFor="meeting-description">
+          Description <span className="text-text-primary/50">(optional)</span>
+        </label>
+        <textarea
+          id="meeting-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          placeholder="What's this meeting about?"
+          className="resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary dark:bg-white/5 dark:border-border dark:text-text-primary"
+        />
+      </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex flex-1 flex-col gap-1">

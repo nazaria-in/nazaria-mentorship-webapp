@@ -2,6 +2,12 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { fetchPodMemberGroups } from "@/lib/api/pods";
+import { scheduleAssignmentReminders } from "@/lib/notifications/assignment-notifications";
+import {
+  checkAndNotifyAssignmentCompletion,
+  notifyAssignmentSubmitted,
+  notifyAssignmentReviewed,
+} from "@/lib/notifications/assignment-notifications";
 import type { UserRole } from "@/types/users";
 import type {
   Assignment,
@@ -146,9 +152,28 @@ export async function fetchMenteeAssignmentSummaries(
   return summaries;
 }
 
-
 // ---- Mentee actions ----
 
+interface SubmittedVersionRow extends MenteeSubmission {
+  mentee_assignment: {
+    id: string;
+    mentee_id: string;
+    assigned_by: string;
+    assignment: { title: string } | null;
+    mentee: { full_name: string | null } | null;
+  } | null;
+}
+
+/**
+ * Inserts the submission, then notifies whoever dispatched this assignment
+ * (mentee_assignments.assigned_by — the mentor/staff who assigned it, the
+ * correct "review this" recipient regardless of whether that was a mentor
+ * or a staff member). AddSubmissionForm only ever has slotId/
+ * menteeAssignmentId/nextVersionNumber in scope, so the mentor id, mentee's
+ * display name, and assignment title are all resolved here via the same
+ * single-query-join pattern reviewSubmission below uses, rather than
+ * pushing that lookup onto the caller.
+ */
 export async function submitVersion(input: {
   mentee_assignment_id: string;
   slot_id: string;
@@ -159,19 +184,54 @@ export async function submitVersion(input: {
   const { data, error } = await supabase
     .from("mentee_submissions")
     .insert({ ...input, status: "pending_review" })
-    .select("*")
+    .select(
+      "*, mentee_assignment:mentee_assignments(id, mentee_id, assigned_by, assignment:assignments(title), mentee:users!mentee_assignments_mentee_id_fkey(full_name))"
+    )
     .single();
   if (error) throw error;
-  return data as MenteeSubmission;
+
+  const row = data as unknown as SubmittedVersionRow;
+
+  if (row.mentee_assignment) {
+    try {
+      await notifyAssignmentSubmitted(supabase, {
+        menteeAssignmentId: row.mentee_assignment.id,
+        assignmentTitle: row.mentee_assignment.assignment?.title ?? "Assignment",
+        mentorId: row.mentee_assignment.assigned_by,
+        menteeName: row.mentee_assignment.mentee?.full_name?.trim() || "A mentee",
+      });
+    } catch (notificationError) {
+      console.error("[mentee-assignments] Failed to notify mentor of new submission", notificationError, {
+        menteeAssignmentId: row.mentee_assignment.id,
+      });
+    }
+  }
+
+  const { mentee_assignment: _menteeAssignment, ...submission } = row;
+  return submission as MenteeSubmission;
 }
 
 // ---- Mentor/staff actions ----
+
+interface ReviewedSubmissionRow extends MenteeSubmission {
+  mentee_assignment: {
+    id: string;
+    mentee_id: string;
+    assignment: { title: string } | null;
+  } | null;
+}
 
 // `status` must be a real submission_status value ("approved" or
 // "revision_requested" — "pending_review" is only ever set by submitVersion).
 // The previous version of this function hardcoded status: "reviewed", which
 // is not a valid enum value for this column — every review silently failed
 // at the DB layer, which is why reviewed submissions kept showing as pending.
+//
+// Now notifies the mentee on EVERY review outcome (approved or
+// revision_requested) via notifyAssignmentReviewed, in addition to the
+// existing completion check — those are two distinct notifications: one
+// per-submission ("your work was reviewed"), one assignment-level
+// ("everything's approved now"). Both can fire from the same approval.
 export async function reviewSubmission(input: {
   submissionId: string;
   feedback: string;
@@ -188,10 +248,43 @@ export async function reviewSubmission(input: {
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", input.submissionId)
-    .select("*")
+    .select("*, mentee_assignment:mentee_assignments(id, mentee_id, assignment:assignments(title))")
     .single();
   if (error) throw error;
-  return data as MenteeSubmission;
+
+  const row = data as unknown as ReviewedSubmissionRow;
+
+  if (row.mentee_assignment) {
+    try {
+      await notifyAssignmentReviewed(supabase, {
+        menteeAssignmentId: row.mentee_assignment.id,
+        assignmentTitle: row.mentee_assignment.assignment?.title ?? "Assignment",
+        menteeId: row.mentee_assignment.mentee_id,
+        status: input.status,
+      });
+    } catch (notificationError) {
+      console.error("[mentee-assignments] Failed to notify mentee of review outcome", notificationError, {
+        submissionId: input.submissionId,
+      });
+    }
+
+    if (input.status === "approved") {
+      try {
+        await checkAndNotifyAssignmentCompletion(supabase, {
+          menteeAssignmentId: row.mentee_assignment.id,
+          menteeId: row.mentee_assignment.mentee_id,
+          assignmentTitle: row.mentee_assignment.assignment?.title ?? "Assignment",
+        });
+      } catch (notificationError) {
+        console.error("[mentee-assignments] Failed to check/notify assignment completion", notificationError, {
+          submissionId: input.submissionId,
+        });
+      }
+    }
+  }
+
+  const { mentee_assignment: _menteeAssignment, ...submission } = row;
+  return submission as MenteeSubmission;
 }
 
 // ---- Dispatch ----
@@ -202,6 +295,12 @@ export async function dispatchAssignment(input: {
   assignedBy: string;
   dueAt: string;
   description?: string | null;
+  /** Needed for the reminder cascade notification copy — pass the value
+   *  already loaded on the caller's side (e.g. AssignmentFormModal's
+   *  rosterTarget) rather than re-fetching it here. */
+  assignmentTitle: string;
+  /** Same reasoning as assignmentTitle — used as the reminder cascade anchor. */
+  assignmentStartDate: string;
 }): Promise<MenteeAssignment[]> {
   const supabase = createClient();
   const rows = input.menteeIds.map((menteeId) => ({
@@ -213,9 +312,26 @@ export async function dispatchAssignment(input: {
   }));
   const { data, error } = await supabase.from("mentee_assignments").insert(rows).select("*");
   if (error) throw error;
-  return (data ?? []) as MenteeAssignment[];
-}
+  const created = (data ?? []) as MenteeAssignment[];
 
+  for (const menteeAssignment of created) {
+    try {
+      await scheduleAssignmentReminders(supabase, {
+        menteeAssignmentId: menteeAssignment.id,
+        menteeId: menteeAssignment.mentee_id,
+        assignmentTitle: input.assignmentTitle,
+        assignmentStartDate: input.assignmentStartDate,
+        dueAt: menteeAssignment.due_at,
+      });
+    } catch (notificationError) {
+      console.error("[mentee-assignments] Failed to schedule reminders for dispatched mentee", notificationError, {
+        menteeAssignmentId: menteeAssignment.id,
+      });
+    }
+  }
+
+  return created;
+}
 
 export interface AssignedMenteeRef {
   menteeAssignmentId: string;
@@ -325,20 +441,19 @@ export async function fetchMenteeAssignmentsForTimeline(
   return (data ?? []) as unknown as MenteeAssignmentTimelineRow[];
 }
 
-
 export interface FetchAssignedAssignmentsForUserParams {
   role: UserRole;
   userId: string | null;
 }
- 
+
 interface MenteeAssignmentWithAssignmentRow {
   id: string;
   mentee_id: string;
   assignment: Assignment | null;
 }
- 
+
 const ASSIGNED_SELECT = "id, mentee_id, assignment:assignments(*)";
- 
+
 function dedupeByAssignmentId(rows: MenteeAssignmentWithAssignmentRow[]): Assignment[] {
   const map = new Map<string, Assignment>();
   for (const row of rows) {
@@ -346,7 +461,7 @@ function dedupeByAssignmentId(rows: MenteeAssignmentWithAssignmentRow[]): Assign
   }
   return Array.from(map.values());
 }
- 
+
 /**
  * Assignments actually dispatched to the logged-in user, via mentee_assignments
  * (not the raw assignments table — an assignment only "belongs" to someone once
@@ -360,7 +475,7 @@ export async function fetchAssignedAssignmentsForUser(
 ): Promise<Assignment[]> {
   const { role, userId } = params;
   const supabase = createClient();
- 
+
   if (role === "mentee") {
     if (!userId) return [];
     const { data, error } = await supabase
@@ -370,13 +485,13 @@ export async function fetchAssignedAssignmentsForUser(
     if (error) throw error;
     return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
   }
- 
+
   if (role === "mentor") {
     if (!userId) return [];
     const podGroups = await fetchPodMemberGroups({ role: "mentee", mentorId: userId, includeEmptyPods: true });
     const menteeIds = Array.from(new Set(podGroups.flatMap((pod) => pod.members.map((m) => m.id))));
     if (menteeIds.length === 0) return [];
- 
+
     const { data, error } = await supabase
       .from("mentee_assignments")
       .select(ASSIGNED_SELECT)
@@ -384,7 +499,7 @@ export async function fetchAssignedAssignmentsForUser(
     if (error) throw error;
     return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
   }
- 
+
   // pm / associate: everything dispatched, across all mentees
   const { data, error } = await supabase.from("mentee_assignments").select(ASSIGNED_SELECT);
   if (error) throw error;

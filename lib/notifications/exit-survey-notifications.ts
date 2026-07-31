@@ -28,6 +28,18 @@ export interface MeetingWindow {
  * mentor with 2 mentees in one meeting gets 2 separate reminders, one per
  * mentee's survey, because those are 2 separate exit_surveys rows they
  * each need to fill in independently.
+ *
+ * CLAMPED, NOT SKIPPED: earlier versions of this function early-returned
+ * entirely if the computed trigger time had already passed by the time
+ * this ran. In practice, meeting creation involves several sequential
+ * awaited steps before this function is even reached (Calendar event
+ * creation, per-participant invite + reminder scheduling, exit-survey
+ * provisioning) — for short meetings (test meetings especially, but real
+ * short check-ins too) that processing time alone can exceed the trigger
+ * window, silently producing zero reminders with no error anywhere. Now
+ * clamped to "now" instead: if the intended trigger has already passed,
+ * the reminder still gets created, just scheduled immediately rather than
+ * abandoned.
  */
 export async function scheduleExitSurveyReminders(
   supabase: NotificationsClient,
@@ -37,8 +49,7 @@ export async function scheduleExitSurveyReminders(
   const startsAtMs = new Date(meetingWindow.startsAt).getTime();
   const endsAtMs = new Date(meetingWindow.endsAt).getTime();
   const triggerMs = startsAtMs + EXIT_SURVEY_TRIGGER_PERCENT * (endsAtMs - startsAtMs);
-
-  if (triggerMs <= Date.now()) return; // meeting window already past the trigger point — nothing to schedule
+  const scheduledFor = new Date(Math.max(triggerMs, Date.now()));
 
   for (const row of rows) {
     await createNotification(supabase, {
@@ -47,7 +58,7 @@ export async function scheduleExitSurveyReminders(
       title: `Exit survey — ${row.meetingTitle}`,
       body: "Please fill out your exit survey.",
       recipientUserIds: [row.submitterUserId],
-      scheduledFor: new Date(triggerMs),
+      scheduledFor,
       exitSurveyId: row.exitSurveyId,
     });
   }

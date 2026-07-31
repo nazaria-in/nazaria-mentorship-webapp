@@ -51,22 +51,22 @@ export function getNotificationAction(notification: NotificationWithDelivery): N
 
     case "assignment_due":
       return notification.mentee_assignment_id
-        ? { label: "View assignment", href: `/assignments/${notification.mentee_assignment_id}` }
+        ? { label: "View assignment", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
         : null;
 
     case "assignment_submitted":
       return notification.mentee_assignment_id
-        ? { label: "Review submission", href: `/assignments/${notification.mentee_assignment_id}` }
+        ? { label: "Review submission", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
         : null;
 
     case "assignment_reviewed":
       return notification.mentee_assignment_id
-        ? { label: "View feedback", href: `/assignments/${notification.mentee_assignment_id}` }
+        ? { label: "View feedback", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
         : null;
 
     case "achievement":
       return notification.mentee_assignment_id
-        ? { label: "View assignment", href: `/assignments/${notification.mentee_assignment_id}` }
+        ? { label: "View assignment", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
         : null;
 
     case "message":

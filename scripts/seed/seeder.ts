@@ -12,6 +12,11 @@
  *   conversations -> conversation_participants -> messages ->
  *   notifications -> user_notifications
  *
+ * Then seeds a fixed set of FRESH TEST ACCOUNTS (one mentor, one mentee, one
+ * pod containing both) with known credentials — see FRESH_TEST_ACCOUNTS
+ * below — so you always have a clean login to test from regardless of what
+ * seeddata.json contains or how stale it's gotten.
+ *
  * ENUM VALUES (confirmed via live DB introspection - keep this in sync with
  * the actual Postgres enums if you ever alter them):
  *   user_role                    : pm | associate | mentor | mentee
@@ -48,6 +53,27 @@
  * explicit uuid on insert, and doing so keeps every cross-reference in
  * seeddata.json 100% stable and human-readable.
  *
+ * NOTIFICATIONS SEEDING — CHANGED
+ * The previous version of steps 19-20 did a raw upsert of
+ * seeddata.json["notifications"] / ["user_notifications"] verbatim. This
+ * produced rows that don't match what the real app ever produces:
+ *   - scheduled_for was whatever (or null) was authored in the JSON, but
+ *     lib/api/notifications.ts's createNotification() ALWAYS sets it
+ *     (defaults to now()) — so seeded rows with null scheduled_for could
+ *     never occur through real app usage, and silently broke
+ *     dispatch-notifications' `.lte("notifications.scheduled_for", ...)`
+ *     filter (a null never satisfies lte).
+ *   - user_notifications fanout was a hand-authored parallel array in
+ *     seeddata.json, which can drift out of sync with the notification's
+ *     actual recipients (e.g. a meeting's real participant list).
+ * Fixed below: scheduled_for is always forced to a real timestamp, and
+ * fanout is DERIVED from each notification's own foreign key (meeting_id ->
+ * meeting_participants, mentee_assignment_id -> that assignment's mentee,
+ * exit_survey_id -> that survey's user_id, message_id -> conversation
+ * participants) instead of trusted from the JSON's separate array. This
+ * mirrors exactly what createNotification()'s real recipientUserIds
+ * resolution looks like at each call site.
+ *
  * USAGE
  *   1. npm install @supabase/supabase-js dotenv tsx --save-dev
  *   2. Add to .env.local (or .env):
@@ -69,6 +95,8 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import * as dotenv from "dotenv";
+
+import { randomUUID } from "crypto";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config(); // fallback to .env
@@ -405,11 +433,37 @@ interface PublicUserRow {
   approval_status: ApprovalStatus;
 }
 
-async function seedUsers(users: SeedUser[]): Promise<void> {
+/** Shared by seedUsers() and seedFreshTestAccounts() — looks up an existing
+ *  auth user by email, or creates one, and returns its real id. */
+async function resolveOrCreateAuthUser(
+  email: string,
+  role: UserRole,
+  emailToId: Map<string, string>
+): Promise<string> {
+  const existing = emailToId.get(email);
+  if (existing) return existing;
+
+  const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+    email,
+    password: DEFAULT_PASSWORD,
+    email_confirm: true,
+    user_metadata: { role, seeded: true },
+  });
+  if (createErr) throw createErr;
+  if (!created.user) {
+    throw new Error(`Auth user creation returned no user for ${email}`);
+  }
+  emailToId.set(email, created.user.id);
+  return created.user.id;
+}
+
+async function seedUsers(users: SeedUser[]): Promise<Map<string, string>> {
   console.log("Seeding auth users + public.users...");
 
-  const { data: existingList, error: listErr } =
-    await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const { data: existingList, error: listErr } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
   if (listErr) throw listErr;
 
   const emailToId = new Map<string, string>();
@@ -418,25 +472,7 @@ async function seedUsers(users: SeedUser[]): Promise<void> {
   }
 
   for (const seedUser of users) {
-    let realId: string | undefined = emailToId.get(seedUser.email);
-
-    if (!realId) {
-      const { data: created, error: createErr } =
-        await supabase.auth.admin.createUser({
-          email: seedUser.email,
-          password: DEFAULT_PASSWORD,
-          email_confirm: true,
-          user_metadata: { role: seedUser.role, seeded: true },
-        });
-      if (createErr) throw createErr;
-      if (!created.user) {
-        throw new Error(
-          `Auth user creation returned no user for ${seedUser.email}`
-        );
-      }
-      realId = created.user.id;
-    }
-
+    const realId = await resolveOrCreateAuthUser(seedUser.email, seedUser.role, emailToId);
     idMap.set(seedUser.id, realId);
   }
 
@@ -452,6 +488,263 @@ async function seedUsers(users: SeedUser[]): Promise<void> {
   }));
 
   await upsert<PublicUserRow>("users", publicUsersRows, "public.users");
+
+  return emailToId;
+}
+
+// ---------------------------------------------------------------------------
+// Fresh test accounts — fixed emails/passwords, always available regardless
+// of seeddata.json's contents. One mentor + one mentee + one pod containing
+// both, in a dedicated "Test Cohort" so they don't get mixed into whatever
+// pods your real seed data sets up.
+// ---------------------------------------------------------------------------
+
+const FRESH_TEST_ACCOUNTS = {
+  cohortId: "00000000-0000-0000-0000-000000000f01",
+  podId: "00000000-0000-0000-0000-000000000f02",
+  mentor: {
+    id: "00000000-0000-0000-0000-000000000f03",
+    email: "test.mentor@nazariacollective.in",
+    password: "TestMentor123!",
+  },
+  mentee: {
+    id: "00000000-0000-0000-0000-000000000f04",
+    email: "test.mentee@nazariacollective.in",
+    password: "TestMentee123!",
+  },
+} as const;
+
+async function seedFreshTestAccounts(emailToId: Map<string, string>): Promise<void> {
+  console.log("Seeding fresh test accounts (mentor + mentee + pod)...");
+
+  // Auth users — created directly with their own fixed passwords rather than
+  // DEFAULT_PASSWORD, so they're easy to remember and distinct from the bulk
+  // seed accounts.
+  async function resolveOrCreateWithOwnPassword(
+    email: string,
+    password: string,
+    role: UserRole
+  ): Promise<string> {
+    const existing = emailToId.get(email);
+    if (existing) return existing;
+
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { role, seeded: true, freshTestAccount: true },
+    });
+    if (createErr) throw createErr;
+    if (!created.user) throw new Error(`Auth user creation returned no user for ${email}`);
+    emailToId.set(email, created.user.id);
+    return created.user.id;
+  }
+
+  const mentorAuthId = await resolveOrCreateWithOwnPassword(
+    FRESH_TEST_ACCOUNTS.mentor.email,
+    FRESH_TEST_ACCOUNTS.mentor.password,
+    "mentor"
+  );
+  const menteeAuthId = await resolveOrCreateWithOwnPassword(
+    FRESH_TEST_ACCOUNTS.mentee.email,
+    FRESH_TEST_ACCOUNTS.mentee.password,
+    "mentee"
+  );
+
+  await upsert<PublicUserRow>(
+    "users",
+    [
+      {
+        id: mentorAuthId,
+        role: "mentor",
+        bio: "Fresh test mentor account.",
+        background_notes: null,
+        goals: null,
+        interests: null,
+        school_or_org: null,
+        approval_status: "approved",
+      },
+      {
+        id: menteeAuthId,
+        role: "mentee",
+        bio: "Fresh test mentee account.",
+        background_notes: null,
+        goals: null,
+        interests: null,
+        school_or_org: null,
+        approval_status: "approved",
+      },
+    ],
+    "fresh test users"
+  );
+
+  await upsert<SeedCohort>(
+    "cohorts",
+    [
+      {
+        id: FRESH_TEST_ACCOUNTS.cohortId,
+        name: "Test Cohort (fresh accounts)",
+        start_date: null,
+        end_date: null,
+        status: "active",
+        description: "Reserved cohort for the fixed fresh-account mentor/mentee used in manual testing.",
+      },
+    ],
+    "test cohort"
+  );
+
+  await upsert<SeedPod>(
+    "pods",
+    [
+      {
+        id: FRESH_TEST_ACCOUNTS.podId,
+        cohort_id: FRESH_TEST_ACCOUNTS.cohortId,
+        name: "Test Pod (fresh accounts)",
+        skill_level: null,
+        description: "Reserved pod for the fixed fresh-account mentor/mentee used in manual testing.",
+      },
+    ],
+    "test pod"
+  );
+
+  await upsert<{ id: string; pod_id: string; user_id: string }>(
+    "pod_members",
+    [
+      { id: "00000000-0000-0000-0000-000000000f05", pod_id: FRESH_TEST_ACCOUNTS.podId, user_id: mentorAuthId },
+      { id: "00000000-0000-0000-0000-000000000f06", pod_id: FRESH_TEST_ACCOUNTS.podId, user_id: menteeAuthId },
+    ],
+    "test pod_members"
+  );
+
+  console.log("  ✓ Fresh test accounts ready:");
+  console.log(`      mentor -> ${FRESH_TEST_ACCOUNTS.mentor.email} / ${FRESH_TEST_ACCOUNTS.mentor.password}`);
+  console.log(`      mentee -> ${FRESH_TEST_ACCOUNTS.mentee.email} / ${FRESH_TEST_ACCOUNTS.mentee.password}`);
+}
+
+// ---------------------------------------------------------------------------
+// Steps 19-20: notifications + user_notifications, fanout DERIVED from each
+// notification's real foreign key rather than trusted from seeddata.json's
+// separate user_notifications array. See header comment for why.
+// ---------------------------------------------------------------------------
+
+interface RemappedSeedNotification extends Omit<SeedNotification, "scheduled_for"> {
+  scheduled_for: string;
+}
+
+async function resolveRecipientsForNotification(
+  notification: SeedNotification
+): Promise<string[]> {
+  if (notification.meeting_id) {
+    const { data, error } = await supabase
+      .from("meeting_participants")
+      .select("user_id")
+      .eq("meeting_id", notification.meeting_id);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.user_id as string);
+  }
+
+  if (notification.mentee_assignment_id) {
+    const { data, error } = await supabase
+      .from("mentee_assignments")
+      .select("mentee_id")
+      .eq("id", notification.mentee_assignment_id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? [data.mentee_id as string] : [];
+  }
+
+  if (notification.exit_survey_id) {
+    const { data, error } = await supabase
+      .from("exit_surveys")
+      .select("user_id")
+      .eq("id", notification.exit_survey_id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? [data.user_id as string] : [];
+  }
+
+  if (notification.message_id) {
+    const { data: message, error: messageError } = await supabase
+      .from("messages")
+      .select("conversation_id, sender_id")
+      .eq("id", notification.message_id)
+      .maybeSingle();
+    if (messageError) throw messageError;
+    if (!message) return [];
+
+    const { data: participants, error: participantsError } = await supabase
+      .from("conversation_participants")
+      .select("user_id")
+      .eq("conversation_id", message.conversation_id as string)
+      .is("left_at", null)
+      .neq("user_id", message.sender_id as string);
+    if (participantsError) throw participantsError;
+    return (participants ?? []).map((r) => r.user_id as string);
+  }
+
+  // No FK to derive recipients from (e.g. a generic "reminder" with only
+  // resource_id) — fall back to whatever seeddata.json's parallel array
+  // says for this specific notification id, since there's genuinely no
+  // other source of truth for it.
+  return [];
+}
+
+async function seedNotifications(
+  notifications: SeedNotification[],
+  fallbackUserNotifications: SeedUserNotification[]
+): Promise<void> {
+  if (!notifications || notifications.length === 0) return;
+
+  const remapped: RemappedSeedNotification[] = notifications.map((n) => ({
+    ...remap(n, ["created_by"]),
+    // ALWAYS force a real timestamp — matches what createNotification() does
+    // in the real app. A null here can never happen through real usage and
+    // silently breaks dispatch-notifications' scheduled_for filter.
+    scheduled_for: n.scheduled_for ?? new Date().toISOString(),
+  }));
+
+  await upsert<RemappedSeedNotification>("notifications", remapped, "notifications");
+
+  const fanoutByNotificationId = new Map<string, SeedUserNotification[]>();
+  for (const row of fallbackUserNotifications) {
+    const list = fanoutByNotificationId.get(row.notification_id) ?? [];
+    list.push(row);
+    fanoutByNotificationId.set(row.notification_id, list);
+  }
+
+  const fanoutRows: SeedUserNotification[] = [];
+  let derivedCount = 0;
+  let fallbackCount = 0;
+
+  for (const notification of notifications) {
+    const derivedRecipients = await resolveRecipientsForNotification(notification);
+
+    if (derivedRecipients.length > 0) {
+      derivedCount += derivedRecipients.length;
+      derivedRecipients.forEach((userId, index) => {
+        fanoutRows.push({
+          id: randomUUID(),
+          notification_id: notification.id,
+          user_id: mapId(userId),
+          status: "pending",
+          sent_at: null,
+          read_at: null,
+        });
+      });
+      continue;
+    }
+
+    // No derivable FK — use whatever seeddata.json authored for this one,
+    // remapped through idMap.
+    const fallback = fanoutByNotificationId.get(notification.id) ?? [];
+    fallbackCount += fallback.length;
+    for (const row of fallback) {
+      fanoutRows.push(remap(row, ["user_id", "notification_id"]));
+    }
+  }
+
+  await upsert<SeedUserNotification>("user_notifications", fanoutRows, "user_notifications");
+  console.log(`    (fanout: ${derivedCount} derived from FKs, ${fallbackCount} from seeddata.json fallback)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +759,7 @@ async function main(): Promise<void> {
   console.log(`Loaded seeddata.json from ${jsonPath}\n`);
 
   // 1. Users (auth + public), builds idMap for everything below
-  await seedUsers(data.users);
+  const emailToId = await seedUsers(data.users);
 
   // 2. Cohorts (no user FK to remap)
   await upsert<SeedCohort>("cohorts", data.cohorts, "cohorts");
@@ -547,9 +840,7 @@ async function main(): Promise<void> {
   // 14. Resources & courses (created_by, assigned_to are users)
   await upsert<SeedResourceOrCourse>(
     "resources_and_courses",
-    data.resources_and_courses.map((r) =>
-      remap(r, ["created_by", "assigned_to"])
-    ),
+    data.resources_and_courses.map((r) => remap(r, ["created_by", "assigned_to"])),
     "resources_and_courses"
   );
 
@@ -581,22 +872,21 @@ async function main(): Promise<void> {
     "messages"
   );
 
-  // 19. Notifications (created_by is a user)
-  await upsert<SeedNotification>(
-    "notifications",
+  // 19 + 20. Notifications + user_notifications — see seedNotifications()
+  // header comment for why this is no longer a plain remap+upsert pair.
+  console.log("Seeding notifications (scheduled_for forced, fanout derived from FKs)...");
+  await seedNotifications(
     data.notifications.map((r) => remap(r, ["created_by"])),
-    "notifications"
+    data.user_notifications
   );
 
-  // 20. User notifications (user_id)
-  await upsert<SeedUserNotification>(
-    "user_notifications",
-    data.user_notifications.map((r) => remap(r, ["user_id"])),
-    "user_notifications"
-  );
+  // 21. Fresh, fixed-credential test accounts — independent of seeddata.json.
+  await seedFreshTestAccounts(emailToId);
 
   console.log("\n✅ Seeding complete.");
-  console.log(`   Seed user password (all accounts): ${DEFAULT_PASSWORD}`);
+  console.log(`   Bulk seed user password: ${DEFAULT_PASSWORD}`);
+  console.log(`   Fresh mentor: ${FRESH_TEST_ACCOUNTS.mentor.email} / ${FRESH_TEST_ACCOUNTS.mentor.password}`);
+  console.log(`   Fresh mentee: ${FRESH_TEST_ACCOUNTS.mentee.email} / ${FRESH_TEST_ACCOUNTS.mentee.password}`);
 }
 
 main().catch((err: unknown) => {

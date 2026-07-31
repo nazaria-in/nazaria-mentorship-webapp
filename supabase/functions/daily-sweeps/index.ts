@@ -28,7 +28,7 @@ function daysAgoIso(days: number): string {
 
 Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${Deno.env.get("CRON_SECRET")}`) {
+  if (authHeader !== `Bearer ${Deno.env.get("SUPABASE_SECRET_KEYS")}`) {
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
   }
 

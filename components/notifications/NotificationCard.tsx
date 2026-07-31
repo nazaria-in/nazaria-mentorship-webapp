@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationRead } from "@/lib/api/notifications";
@@ -19,8 +20,12 @@ export interface NotificationCardProps {
   dense?: boolean;
 }
 
+type LocalRsvpStatus = "accepted" | "declined" | null;
+
 export function NotificationCard({ notification, onRead, dense = false }: NotificationCardProps): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [isResolving, setIsResolving] = useState(false);
+  const [localRsvpStatus, setLocalRsvpStatus] = useState<LocalRsvpStatus>(null);
   const isUnread = notification.readAt === null;
   const isOverdue = isOverdueNotification(notification);
   const action = getNotificationAction(notification);
@@ -37,7 +42,15 @@ export function NotificationCard({ notification, onRead, dense = false }: Notifi
     setIsResolving(true);
     try {
       await respondToMeetingInvite(notification.meeting_id, status);
+      // Reflect the choice immediately in this card, rather than relying on
+      // a parent refetch that may not happen right away (e.g. the bell
+      // dropdown only reloads on its realtime subscription firing).
+      setLocalRsvpStatus(status);
       await handleMarkRead();
+      // Meeting-bearing surfaces (the /meetings page, dashboard widgets)
+      // key their queries as ["meetings", ...] — invalidate broadly so
+      // every one of them refetches and reflects the new participant status.
+      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
     } catch (error) {
       console.error("[NotificationCard] Failed to respond to meeting invite", error);
     } finally {
@@ -80,24 +93,31 @@ export function NotificationCard({ notification, onRead, dense = false }: Notifi
 
       <div className={`mt-3 flex items-center gap-2 ${isUnread ? "pl-4" : "pl-4"}`}>
         {notification.type === "meeting_invite" ? (
-          <>
-            <button
-              type="button"
-              disabled={isResolving}
-              onClick={() => void handleRespond("accepted")}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              disabled={isResolving}
-              onClick={() => void handleRespond("declined")}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary disabled:opacity-50"
-            >
-              Decline
-            </button>
-          </>
+          localRsvpStatus ? (
+            <p className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+              <Check size={12} className="text-text-accent" />
+              {localRsvpStatus === "accepted" ? "You accepted" : "You declined"}
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={isResolving}
+                onClick={() => void handleRespond("accepted")}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                disabled={isResolving}
+                onClick={() => void handleRespond("declined")}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary disabled:opacity-50"
+              >
+                Decline
+              </button>
+            </>
+          )
         ) : action ? (
           <Link
             href={action.href}

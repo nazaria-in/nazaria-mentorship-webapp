@@ -1,6 +1,7 @@
 // /lib/api/messages.ts
 
 import { createClient } from "@/lib/supabase/client";
+import { notifyNewMessage } from "@/lib/notifications/message-notifications";
 import type {
   Conversation,
   ConversationOversight,
@@ -8,6 +9,7 @@ import type {
   ConversationSummary,
   ComposerDisabledState,
   Message,
+  CreateConversationInput,
 } from "@/types/messages";
 
 const supabase = createClient();
@@ -82,6 +84,52 @@ export async function fetchMessages(
 // Mutations
 // ============================================================
 
+interface ConversationForNotificationRow {
+  kind: "direct" | "pod" | "broadcast";
+  name: string | null;
+}
+
+interface OtherParticipantNameRow {
+  users: { full_name: string | null } | null;
+}
+
+/**
+ * Resolves a display title for the notification even when the conversation
+ * has no explicit `name` (the common case for `direct` conversations).
+ * MessageComposer only ever calls onSend(body) — it has no conversation
+ * title or sender name in scope — so this has to be resolved here rather
+ * than passed in.
+ */
+async function resolveConversationTitleForNotification(
+  conversationId: string,
+  senderId: string
+): Promise<string> {
+  const { data: conversation, error: conversationError } = await supabase
+    .from("conversations")
+    .select("kind, name")
+    .eq("id", conversationId)
+    .single();
+  if (conversationError) throw conversationError;
+
+  const typedConversation = conversation as ConversationForNotificationRow;
+  if (typedConversation.name) return typedConversation.name;
+  if (typedConversation.kind !== "direct") return "Conversation";
+
+  const { data: otherParticipants, error: otherParticipantsError } = await supabase
+    .from("conversation_participants")
+    .select("users!conversation_participants_user_id_fkey(full_name)")
+    .eq("conversation_id", conversationId)
+    .is("left_at", null)
+    .neq("user_id", senderId);
+  if (otherParticipantsError) throw otherParticipantsError;
+
+  const names = ((otherParticipants ?? []) as unknown as OtherParticipantNameRow[])
+    .map((row) => row.users?.full_name?.trim())
+    .filter((name): name is string => Boolean(name));
+
+  return names[0] ?? "Direct message";
+}
+
 export async function sendMessage(conversationId: string, body: string): Promise<Message> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
@@ -93,7 +141,32 @@ export async function sendMessage(conversationId: string, body: string): Promise
     .select("*")
     .single();
   if (error) throw error;
-  return data as Message;
+
+  const message = data as Message;
+
+  try {
+    const [{ data: senderProfile, error: senderProfileError }, conversationTitle] = await Promise.all([
+      supabase.from("users").select("full_name").eq("id", userData.user.id).single(),
+      resolveConversationTitleForNotification(conversationId, userData.user.id),
+    ]);
+    if (senderProfileError) throw senderProfileError;
+
+    await notifyNewMessage(supabase, {
+      messageId: message.id,
+      conversationId,
+      conversationTitle,
+      senderId: userData.user.id,
+      senderName: (senderProfile?.full_name as string | null)?.trim() || "Someone",
+      body,
+    });
+  } catch (notificationError) {
+    console.error("[messages] Failed to notify participants of new message", notificationError, {
+      messageId: message.id,
+      conversationId,
+    });
+  }
+
+  return message;
 }
 
 export async function forwardMessage(
@@ -126,32 +199,58 @@ export async function markConversationRead(conversationId: string): Promise<void
   if (error) throw error;
 }
 
-export async function createConversation(
-  participantIds: string[],
-  name?: string
-): Promise<Conversation> {
+export async function createConversation(input: CreateConversationInput): Promise<Conversation> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!userData.user) throw new Error("Not authenticated.");
 
+  if (input.kind === "pod" && !input.podId) {
+    throw new Error("podId is required for pod conversations.");
+  }
+  if (!input.name.trim()) {
+    throw new Error("Conversation name is required.");
+  }
+
   const { data: conversation, error: conversationError } = await supabase
     .from("conversations")
-    .insert({ kind: "direct", created_by: userData.user.id, name: name ?? null })
+    .insert({
+      kind: input.kind,
+      created_by: userData.user.id,
+      name: input.name.trim(),
+      pod_id: input.kind === "pod" ? input.podId : null,
+    })
     .select("*")
     .single();
   if (conversationError) throw conversationError;
 
-  const allParticipantIds = Array.from(new Set([...participantIds, userData.user.id]));
+  const participantMap = new Map<string, boolean>(
+    input.participants.map((p) => [p.userId, p.canMessage])
+  );
+  participantMap.set(userData.user.id, true); // creator always full permission
+
   const { error: participantsError } = await supabase.from("conversation_participants").insert(
-    allParticipantIds.map((userId) => ({
+    Array.from(participantMap.entries()).map(([userId, canMessage]) => ({
       conversation_id: conversation.id as string,
       user_id: userId,
-      can_message: true,
+      can_message: canMessage,
     }))
   );
   if (participantsError) throw participantsError;
 
   return conversation as Conversation;
+}
+
+export async function updateParticipantPermission(
+  conversationId: string,
+  userId: string,
+  canMessage: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ can_message: canMessage })
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId);
+  if (error) throw error;
 }
 
 /** Staff explicitly joining a conversation they weren't already part of. See plan §10. */

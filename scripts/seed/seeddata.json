@@ -1,0 +1,371 @@
+{
+  "users": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "email": "pm.priya@nazariacollective.in",
+      "role": "pm",
+      "bio": "Program manager overseeing the Basti Media School cohort.",
+      "background_notes": null,
+      "goals": null,
+      "interests": null,
+      "school_or_org": "Nazaria Arts Collective",
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000002",
+      "email": "associate.amit@nazariacollective.in",
+      "role": "associate",
+      "bio": "Associate supporting pod operations.",
+      "background_notes": null,
+      "goals": null,
+      "interests": null,
+      "school_or_org": "Nazaria Arts Collective",
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000003",
+      "email": "mentor.rahul@example.com",
+      "role": "mentor",
+      "bio": "Documentary photographer, mentoring Pod Alpha.",
+      "background_notes": "5 years of photojournalism experience.",
+      "goals": null,
+      "interests": ["photography", "documentary film"],
+      "school_or_org": null,
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000004",
+      "email": "mentor.sana@example.com",
+      "role": "mentor",
+      "bio": "Radio producer, mentoring Pod Beta.",
+      "background_notes": "8 years in community radio.",
+      "goals": null,
+      "interests": ["audio production", "storytelling"],
+      "school_or_org": null,
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000005",
+      "email": "mentee.asha@example.com",
+      "role": "mentee",
+      "bio": "Aspiring photojournalist.",
+      "background_notes": null,
+      "goals": ["Build a photo portfolio", "Learn photo editing"],
+      "interests": ["photography"],
+      "school_or_org": "Govt. Girls Senior Secondary School",
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000006",
+      "email": "mentee.farhan@example.com",
+      "role": "mentee",
+      "bio": "Interested in documentary storytelling.",
+      "background_notes": null,
+      "goals": ["Make a short documentary"],
+      "interests": ["film", "editing"],
+      "school_or_org": "Delhi Public School",
+      "approval_status": "approved"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000007",
+      "email": "mentee.zara@example.com",
+      "role": "mentee",
+      "bio": "Interested in radio and podcasting.",
+      "background_notes": null,
+      "goals": ["Produce a podcast episode"],
+      "interests": ["audio", "radio"],
+      "school_or_org": "Kendriya Vidyalaya",
+      "approval_status": "approved"
+    }
+  ],
+
+  "cohorts": [
+    {
+      "id": "20000000-0000-0000-0000-000000000001",
+      "name": "Basti Media School — Cohort 3",
+      "start_date": "2026-06-01",
+      "end_date": "2026-12-01",
+      "status": "active",
+      "description": "Third cohort of the Basti Media School program."
+    }
+  ],
+
+  "pods": [
+    {
+      "id": "30000000-0000-0000-0000-000000000001",
+      "cohort_id": "20000000-0000-0000-0000-000000000001",
+      "name": "Pod Alpha",
+      "skill_level": "beginner",
+      "description": "Photography-focused pod."
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000002",
+      "cohort_id": "20000000-0000-0000-0000-000000000001",
+      "name": "Pod Beta",
+      "skill_level": "beginner",
+      "description": "Audio/radio-focused pod."
+    }
+  ],
+
+  "pod_members": [
+    { "id": "40000000-0000-0000-0000-000000000001", "pod_id": "30000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000003" },
+    { "id": "40000000-0000-0000-0000-000000000002", "pod_id": "30000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000005" },
+    { "id": "40000000-0000-0000-0000-000000000003", "pod_id": "30000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000006" },
+    { "id": "40000000-0000-0000-0000-000000000004", "pod_id": "30000000-0000-0000-0000-000000000002", "user_id": "10000000-0000-0000-0000-000000000004" },
+    { "id": "40000000-0000-0000-0000-000000000005", "pod_id": "30000000-0000-0000-0000-000000000002", "user_id": "10000000-0000-0000-0000-000000000007" }
+  ],
+
+  "assignments": [
+    {
+      "id": "50000000-0000-0000-0000-000000000001",
+      "title": "Photo Essay Basics",
+      "description": "Create a 5-photo essay documenting daily life in your neighborhood.",
+      "instructions": "Focus on composition and natural light. Submit a draft, then a final cut.",
+      "week_number": 3,
+      "start_date": "2026-08-01",
+      "end_date": "2026-08-20",
+      "is_active": true,
+      "created_by": "10000000-0000-0000-0000-000000000003"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000002",
+      "title": "Interview Techniques",
+      "description": "Record a 3-minute interview with a community member.",
+      "instructions": "Practice active listening and follow-up questions.",
+      "week_number": 3,
+      "start_date": "2026-08-01",
+      "end_date": "2026-08-18",
+      "is_active": true,
+      "created_by": "10000000-0000-0000-0000-000000000004"
+    }
+  ],
+
+  "assignment_submission_slots": [
+    { "id": "60000000-0000-0000-0000-000000000001", "assignment_id": "50000000-0000-0000-0000-000000000001", "title": "Draft", "order_index": 0, "max_versions": 3 },
+    { "id": "60000000-0000-0000-0000-000000000002", "assignment_id": "50000000-0000-0000-0000-000000000001", "title": "Final Cut", "order_index": 1, "max_versions": 2 },
+    { "id": "60000000-0000-0000-0000-000000000003", "assignment_id": "50000000-0000-0000-0000-000000000002", "title": "Recording", "order_index": 0, "max_versions": 2 }
+  ],
+
+  "mentee_assignments": [
+    {
+      "id": "70000000-0000-0000-0000-000000000001",
+      "mentee_id": "10000000-0000-0000-0000-000000000005",
+      "assignment_id": "50000000-0000-0000-0000-000000000001",
+      "assigned_by": "10000000-0000-0000-0000-000000000003",
+      "description": null,
+      "due_at": "2026-08-20T18:30:00.000Z",
+      "is_completed": false
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000002",
+      "mentee_id": "10000000-0000-0000-0000-000000000006",
+      "assignment_id": "50000000-0000-0000-0000-000000000001",
+      "assigned_by": "10000000-0000-0000-0000-000000000003",
+      "description": null,
+      "due_at": "2026-08-20T18:30:00.000Z",
+      "is_completed": false
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000003",
+      "mentee_id": "10000000-0000-0000-0000-000000000007",
+      "assignment_id": "50000000-0000-0000-0000-000000000002",
+      "assigned_by": "10000000-0000-0000-0000-000000000004",
+      "description": null,
+      "due_at": "2026-08-18T18:30:00.000Z",
+      "is_completed": false
+    }
+  ],
+
+  "files": [
+    {
+      "id": "80000000-0000-0000-0000-000000000001",
+      "title": "Draft photo essay",
+      "description": "First draft, 5 photos.",
+      "file_type": "file",
+      "url": "https://example.com/seed-files/photo-essay-draft.pdf",
+      "created_by": "10000000-0000-0000-0000-000000000005"
+    }
+  ],
+
+  "mentee_submissions": [
+    {
+      "id": "90000000-0000-0000-0000-000000000001",
+      "mentee_assignment_id": "70000000-0000-0000-0000-000000000001",
+      "slot_id": "60000000-0000-0000-0000-000000000001",
+      "file_id": "80000000-0000-0000-0000-000000000001",
+      "version_number": 1,
+      "status": "pending_review",
+      "feedback": null,
+      "reviewed_by": null
+    }
+  ],
+
+  "meeting_series": [
+    {
+      "id": "a0000000-0000-0000-0000-000000000001",
+      "created_by": "10000000-0000-0000-0000-000000000003",
+      "title": "Pod Alpha Weekly Sync",
+      "description": "Recurring weekly check-in for Pod Alpha.",
+      "recurrence": "weekly",
+      "recurrence_until": "2026-12-01T00:00:00.000Z"
+    }
+  ],
+
+  "meetings": [
+    {
+      "id": "b0000000-0000-0000-0000-000000000001",
+      "series_id": "a0000000-0000-0000-0000-000000000001",
+      "created_by": "10000000-0000-0000-0000-000000000003",
+      "title": "Pod Alpha Weekly Sync",
+      "description": "Weekly check-in.",
+      "meet_link": null,
+      "starts_at": "2026-08-05T10:00:00.000Z",
+      "ends_at": "2026-08-05T11:00:00.000Z",
+      "status": "scheduled",
+      "notes": null
+    }
+  ],
+
+  "meeting_participants": [
+    { "id": "c0000000-0000-0000-0000-000000000001", "meeting_id": "b0000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000003", "status": "accepted", "responded_at": "2026-07-30T09:00:00.000Z" },
+    { "id": "c0000000-0000-0000-0000-000000000002", "meeting_id": "b0000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000005", "status": "pending", "responded_at": null },
+    { "id": "c0000000-0000-0000-0000-000000000003", "meeting_id": "b0000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000006", "status": "pending", "responded_at": null }
+  ],
+
+  "exit_surveys": [
+    {
+      "id": "d0000000-0000-0000-0000-000000000001",
+      "meeting_id": "b0000000-0000-0000-0000-000000000001",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "user_role": "mentee",
+      "template_snapshot": []
+    }
+  ],
+
+  "resources_and_courses": [
+    {
+      "id": "e0000000-0000-0000-0000-000000000001",
+      "type": "guide",
+      "title": "Camera Basics Guide",
+      "description": "Introductory guide to camera settings and composition.",
+      "links": ["https://example.com/camera-basics"],
+      "status": "ongoing",
+      "week_number": 1,
+      "created_by": "10000000-0000-0000-0000-000000000001",
+      "assigned_to": "10000000-0000-0000-0000-000000000005"
+    }
+  ],
+
+  "resource_updates": [
+    {
+      "id": "f0000000-0000-0000-0000-000000000001",
+      "resource_id": "e0000000-0000-0000-0000-000000000001",
+      "mentee_id": "10000000-0000-0000-0000-000000000005",
+      "progress_note": "Read chapter 1 on aperture and shutter speed.",
+      "progress_percent": 20,
+      "hours_spent": 1.5,
+      "file_id": null
+    }
+  ],
+
+  "conversations": [
+    {
+      "id": "11000000-0000-0000-0000-000000000001",
+      "name": "some name",
+      "created_by": "10000000-0000-0000-0000-000000000003",
+      "last_message_at": "2026-07-30T12:05:00.000Z",
+      "kind": "direct"
+    },
+    {
+      "id": "11000000-0000-0000-0000-000000000002",
+      "name": "Pod Alpha Announcements",
+      "created_by": "10000000-0000-0000-0000-000000000001",
+      "last_message_at": null,
+      "kind": "direct"
+    }
+  ],
+
+  "conversation_participants": [
+    { "id": "12000000-0000-0000-0000-000000000001", "conversation_id": "11000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000003", "can_message": true, "last_read_at": "2026-07-30T12:00:00.000Z" },
+    { "id": "12000000-0000-0000-0000-000000000002", "conversation_id": "11000000-0000-0000-0000-000000000001", "user_id": "10000000-0000-0000-0000-000000000005", "can_message": true, "last_read_at": null }
+  ],
+
+  "messages": [
+    { "id": "13000000-0000-0000-0000-000000000001", "conversation_id": "11000000-0000-0000-0000-000000000001", "sender_id": "10000000-0000-0000-0000-000000000003", "body": "Hi Asha! Excited to get started this week." },
+    { "id": "13000000-0000-0000-0000-000000000002", "conversation_id": "11000000-0000-0000-0000-000000000001", "sender_id": "10000000-0000-0000-0000-000000000005", "body": "Thanks! Looking forward to it." }
+  ],
+
+  "notifications": [
+    {
+      "id": "14000000-0000-0000-0000-000000000001",
+      "created_by": "10000000-0000-0000-0000-000000000003",
+      "type": "meeting_invite",
+      "title": "Pod Alpha Weekly Sync",
+      "body": "You've been invited to a meeting.",
+      "mentee_assignment_id": null,
+      "exit_survey_id": null,
+      "message_id": null,
+      "meeting_id": "b0000000-0000-0000-0000-000000000001",
+      "scheduled_for": null
+    },
+    {
+      "id": "14000000-0000-0000-0000-000000000002",
+      "created_by": null,
+      "type": "assignment_due",
+      "title": "Photo Essay Basics — assigned",
+      "body": "Due 2026-08-20.",
+      "mentee_assignment_id": "70000000-0000-0000-0000-000000000001",
+      "exit_survey_id": null,
+      "message_id": null,
+      "meeting_id": null,
+      "scheduled_for": null
+    },
+    {
+      "id": "14000000-0000-0000-0000-000000000003",
+      "created_by": "10000000-0000-0000-0000-000000000003",
+      "type": "message",
+      "title": "Pod Alpha Weekly Sync",
+      "body": "Rahul: Hi Asha! Excited to get started this week.",
+      "mentee_assignment_id": null,
+      "exit_survey_id": null,
+      "message_id": "13000000-0000-0000-0000-000000000001",
+      "meeting_id": null,
+      "scheduled_for": null
+    },
+    {
+      "id": "14000000-0000-0000-0000-000000000004",
+      "created_by": null,
+      "type": "exit_survey_pending",
+      "title": "Exit survey — Pod Alpha Weekly Sync",
+      "body": "Please fill out your exit survey.",
+      "mentee_assignment_id": null,
+      "exit_survey_id": "d0000000-0000-0000-0000-000000000001",
+      "message_id": null,
+      "meeting_id": null,
+      "scheduled_for": null
+    },
+    {
+      "id": "14000000-0000-0000-0000-000000000005",
+      "created_by": null,
+      "type": "reminder",
+      "title": "Weekly check-in — Camera Basics Guide",
+      "body": "Add a progress update so your mentor can see where things stand.",
+      "mentee_assignment_id": null,
+      "exit_survey_id": null,
+      "message_id": null,
+      "meeting_id": null,
+      "scheduled_for": null
+    }
+  ],
+
+  "user_notifications": [
+    {
+      "id": "15000000-0000-0000-0000-000000000001",
+      "notification_id": "14000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "status": "pending",
+      "sent_at": null,
+      "read_at": null
+    }
+  ]
+}

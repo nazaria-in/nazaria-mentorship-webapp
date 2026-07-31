@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { NotificationType, NotificationWithDelivery } from "@/types/notifications";
 
 export interface NotificationBellProps {
-  userId: string;
+  userId: string | null;
 }
 
 type QuickFilter = "all" | "unread" | "meetings" | "assignments" | "messages";
@@ -38,6 +38,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
   const containerRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async (): Promise<void> => {
+    if (!userId) return;
     setIsLoading(true);
     try {
       const supabase = createClient();
@@ -49,13 +50,14 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
   }, [userId]);
 
   const refreshUnreadCount = useCallback(async (): Promise<void> => {
+    if (!userId) return;
     const supabase = createClient();
     const count = await fetchUnreadNotificationCount(supabase, userId);
     setUnreadCount(count);
   }, [userId]);
 
-  // Handle toggling open/close and loading data in event handler
   const toggleOpen = () => {
+    if (!userId) return;
     setIsOpen((prev) => {
       const nextState = !prev;
       if (nextState) {
@@ -65,13 +67,35 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
     });
   };
 
+  // Initial unread-count fetch + realtime subscription for this userId.
+  // - No setState is ever called synchronously in the effect body.
+  // - The fetch uses AbortController; setState only happens inside the
+  //   resolved-promise callback, guarded by signal.aborted, so a stale
+  //   response from a superseded userId can never overwrite fresh state.
+  // - There is no "reset to null" branch here: when userId is null the
+  //   component's render path below short-circuits to the disabled bell
+  //   before unreadCount/notifications are ever read, so stale values
+  //   sitting unused in state need no explicit clearing.
   useEffect(() => {
-    // Wrap in queueMicrotask to avoid synchronous state update in effect mount
-    queueMicrotask(() => {
-      void refreshUnreadCount();
-    });
+    if (!userId) {
+      return;
+    }
 
+    const controller = new AbortController();
     const supabase = createClient();
+
+    fetchUnreadNotificationCount(supabase, userId)
+      .then((count) => {
+        if (!controller.signal.aborted) {
+          setUnreadCount(count);
+        }
+      })
+      .catch(() => {
+        // Swallow: a failed initial count fetch just leaves the badge at
+        // its previous value; the realtime subscription below will
+        // correct it on the next event.
+      });
+
     const channel = supabase
       .channel(`user_notifications:${userId}`)
       .on(
@@ -85,6 +109,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       .subscribe();
 
     return () => {
+      controller.abort();
       void supabase.removeChannel(channel);
     };
   }, [userId, isOpen, refreshUnreadCount, loadNotifications]);
@@ -106,6 +131,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
   });
 
   async function handleMarkAllRead(): Promise<void> {
+    if (!userId) return;
     const supabase = createClient();
     const scopedIds = quickFilter === "all" ? undefined : filteredNotifications.map((n) => n.id);
     await markAllNotificationsRead(supabase, userId, scopedIds);
@@ -118,13 +144,26 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
     void loadNotifications();
   }
 
+  if (!userId) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-label="Notifications loading"
+        className="relative rounded-full p-2 text-text-primary/40 dark:text-text-primary/30"
+      >
+        <Bell size={20} />
+      </button>
+    );
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={toggleOpen}
         aria-label="Notifications"
-        className="relative rounded-full p-2 text-text-primary hover:bg-card-alt"
+        className="relative rounded-full p-2 text-text-primary hover:bg-card-alt dark:hover:bg-white/5"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -135,15 +174,19 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-2xl border border-border bg-surface shadow-lg">
-          <div className="flex items-center justify-between border-b border-border p-3">
+        <div className="absolute right-0 z-50 mt-2 w-96 max-w-[90vw] rounded-2xl border border-border bg-surface shadow-lg dark:border-white/10 dark:bg-surface">
+          <div className="flex items-center justify-between border-b border-border p-3 dark:border-white/10">
             <p className="font-heading text-sm font-semibold text-text-primary">Notifications</p>
-            <button type="button" onClick={() => void handleMarkAllRead()} className="text-xs font-medium text-text-accent hover:underline">
+            <button
+              type="button"
+              onClick={() => void handleMarkAllRead()}
+              className="text-xs font-medium text-text-accent hover:underline"
+            >
               Mark all read
             </button>
           </div>
 
-          <div className="flex gap-1.5 overflow-x-auto border-b border-border p-2">
+          <div className="flex gap-1.5 overflow-x-auto border-b border-border p-2 dark:border-white/10">
             {(["all", "unread", "meetings", "assignments", "messages"] as QuickFilter[]).map((filter) => (
               <button
                 key={filter}
@@ -152,7 +195,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
                 className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${
                   quickFilter === filter
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-text-muted hover:bg-card-alt"
+                    : "border-border text-text-muted hover:bg-card-alt dark:border-white/10 dark:hover:bg-white/5"
                 }`}
               >
                 {filter}
@@ -172,7 +215,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
             )}
           </div>
 
-          <div className="border-t border-border p-2 text-center">
+          <div className="border-t border-border p-2 text-center dark:border-white/10">
             <Link href="/notifications" className="text-xs font-medium text-text-accent hover:underline" onClick={() => setIsOpen(false)}>
               View all
             </Link>

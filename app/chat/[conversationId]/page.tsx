@@ -86,8 +86,12 @@ export default function ConversationThreadPage() {
 
   return (
     <div className="flex h-full flex-col bg-surface dark:bg-surface">
-      <ConversationHeader name={resolvedName} kind={conversationMeta?.kind ?? "direct"} />
-
+<ConversationHeader
+  conversationId={conversationId}
+  name={resolvedName}
+  kind={conversationMeta?.kind ?? "direct"}
+  canLeave={!isStaff || isActiveParticipant}
+/>
       <MessageList
         messages={messages}
         participants={participants}

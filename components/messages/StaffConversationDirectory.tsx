@@ -24,7 +24,7 @@ export function StaffConversationDirectory() {
     e.stopPropagation();
     await enterConversationAsStaff(conversationId);
     await refetch();
-    router.push(`/messages/${conversationId}`);
+    router.push(`/chat/${conversationId}`);
   }
 
   if (isLoading) {
@@ -32,7 +32,9 @@ export function StaffConversationDirectory() {
   }
 
   if (!conversations || conversations.length === 0) {
-    return <EmptyState title="No conversations yet" description="Nothing has been created across the platform." />;
+    return (
+      <EmptyState title="No conversations yet" description="Nothing has been created across the platform." />
+    );
   }
 
   return (
@@ -40,7 +42,7 @@ export function StaffConversationDirectory() {
       {conversations.map((conversation) => (
         <div
           key={conversation.conversation_id}
-          onClick={() => router.push(`/messages/${conversation.conversation_id}`)}
+          onClick={() => router.push(`/chat/${conversation.conversation_id}`)}
           className={cn(
             "flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors",
             "hover:bg-card-alt dark:hover:bg-card-alt bg-card dark:bg-card border border-border dark:border-border"

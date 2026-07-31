@@ -67,6 +67,43 @@ export async function cancelAssignmentReminders(
   await cancelPendingNotifications(supabase, { menteeAssignmentId });
 }
 
+/**
+ * Guards against firing a duplicate "completed!" achievement notification
+ * for the same menteeAssignmentId. checkAndNotifyAssignmentCompletion is
+ * intentionally called after EVERY approval (it's the only path to this
+ * notification, driven by derived status rather than a manual "mark done"
+ * step) — but derived-status checks alone aren't enough to guarantee
+ * exactly-once delivery if this function is ever invoked more than once
+ * while the assignment is already in the completed state (e.g. a
+ * double-submitted review mutation, or two rapid approvals both reading
+ * "completed" before either write is reflected back). This existence
+ * check is the actual idempotency guarantee; the status check above it
+ * is just an optimization to skip the query entirely in the common case.
+ */
+async function hasExistingCompletionNotification(
+  supabase: NotificationsClient,
+  menteeAssignmentId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("mentee_assignment_id", menteeAssignmentId)
+    .eq("type", "achievement")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[assignment-notifications] Failed to check for existing completion notification", error, {
+      menteeAssignmentId,
+    });
+    // Fail open toward NOT sending a duplicate on error, since a missed
+    // completion ping is a much smaller problem than a duplicate one.
+    return true;
+  }
+
+  return data !== null;
+}
+
 async function notifyAssignmentCompleted(
   supabase: NotificationsClient,
   menteeAssignmentId: string,
@@ -97,16 +134,21 @@ async function notifyAssignmentCompleted(
  * or AssignmentCompletionStatus are showing on screen.
  *
  * Safe to call after every approval, including ones that don't complete
- * the assignment — it's a no-op unless completionStatus === 'completed'.
+ * the assignment, AND safe to call more than once after completion — an
+ * existence check guarantees the "completed!" notification only ever
+ * fires once per menteeAssignmentId. See hasExistingCompletionNotification.
  */
 export async function checkAndNotifyAssignmentCompletion(
   supabase: NotificationsClient,
   input: { menteeAssignmentId: string; menteeId: string; assignmentTitle: string }
 ): Promise<void> {
   const status = await fetchMenteeAssignmentStatus(input.menteeAssignmentId);
-  if (status?.completionStatus === "completed") {
-    await notifyAssignmentCompleted(supabase, input.menteeAssignmentId, input.menteeId, input.assignmentTitle);
-  }
+  if (status?.completionStatus !== "completed") return;
+
+  const alreadyNotified = await hasExistingCompletionNotification(supabase, input.menteeAssignmentId);
+  if (alreadyNotified) return;
+
+  await notifyAssignmentCompleted(supabase, input.menteeAssignmentId, input.menteeId, input.assignmentTitle);
 }
 
 export async function notifyAssignmentSubmitted(

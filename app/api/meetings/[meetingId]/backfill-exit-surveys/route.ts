@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning";
+import { scheduleExitSurveyReminders } from "@/lib/notifications/exit-survey-notifications";
 import type { UserRole } from "@/types/users";
 
 interface RouteParams {
@@ -16,6 +17,11 @@ interface RouteParams {
  * Safe to call repeatedly — createPendingExitSurveys upserts with
  * ignoreDuplicates on (meeting_id, user_id, subject_user_id), so it never
  * clobbers an already-submitted row.
+ *
+ * Also schedules exit-survey reminders for any newly-created rows — this
+ * was previously missing here (present in the main meeting-creation route,
+ * but not mirrored here), meaning any exit survey provisioned via backfill
+ * silently never got a reminder notification.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { meetingId } = await params;
@@ -54,6 +60,42 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       meetingId,
       participantRows.map((r) => r.user_id as string)
     );
+
+    if (result.rowsCreated > 0) {
+      const { data: meeting, error: meetingError } = await admin
+        .from("meetings")
+        .select("title, starts_at, ends_at")
+        .eq("id", meetingId)
+        .single();
+
+      if (meetingError || !meeting) {
+        console.error("[backfill-exit-surveys] Could not load meeting to schedule reminders", meetingError, {
+          meetingId,
+        });
+      } else {
+        const { data: createdSurveyRows, error: createdSurveyRowsError } = await admin
+          .from("exit_surveys")
+          .select("id, user_id")
+          .eq("meeting_id", meetingId);
+
+        if (createdSurveyRowsError) {
+          console.error("[backfill-exit-surveys] Failed to load created exit survey rows for reminder scheduling", createdSurveyRowsError, {
+            meetingId,
+          });
+        } else if (createdSurveyRows && createdSurveyRows.length > 0) {
+          await scheduleExitSurveyReminders(
+            admin,
+            createdSurveyRows.map((row) => ({
+              exitSurveyId: row.id as string,
+              submitterUserId: row.user_id as string,
+              meetingTitle: meeting.title as string,
+            })),
+            { startsAt: meeting.starts_at as string, endsAt: meeting.ends_at as string }
+          );
+        }
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Backfill failed.";

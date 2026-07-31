@@ -88,6 +88,8 @@ export function AssignmentFormModal({
         menteeIds: newIds,
         assignedBy: currentUserId,
         dueAt: dueAt || rosterTarget.end_date || rosterTarget.start_date,
+        assignmentTitle: rosterTarget.title,
+        assignmentStartDate: rosterTarget.start_date,
       });
     },
     onSuccess: () => {

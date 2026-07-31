@@ -39,6 +39,7 @@ export async function signUp({ fullName, email, password }: SignUpInput) {
     .insert({
       id: data.user.id,
       full_name: fullName,
+      email: email,
       role: "mentee", // Default role until onboarding changes it.
     });
 
@@ -72,11 +73,13 @@ export async function signIn({ email, password }: SignInInput) {
 export async function setUserRole(userId: string, role: UserRole) {
   const supabase = createClient();
 
+  const needsApproval = role === "mentor" || role === "associate";
+
   const { error } = await supabase
     .from("users")
     .update({
       role,
-      ...(role === "mentor" ? { approval_status: "pending" as const } : {}),
+      approval_status: needsApproval ? ("pending" as const) : ("approved" as const),
     })
     .eq("id", userId);
 

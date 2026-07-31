@@ -14,18 +14,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const supabase = createClient();
 
-    async function hydrate() {
-      const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData.user;
-      if (!authUser) {
-        clearSession();
-        return;
-      }
-
+    async function hydrateFromUserId(userId: string) {
       const { data: profile } = await supabase
         .from("users")
-        .select("id, role, full_name") // fetched directly from unified table now
-        .eq("id", authUser.id)
+        .select("id, role, full_name")
+        .eq("id", userId)
         .single();
 
       if (profile) {
@@ -34,10 +27,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           fullName: profile.full_name ?? "Anonymous User",
           role: profile.role as Role,
         });
+      } else {
+        clearSession();
       }
     }
 
-    hydrate();
+    // Initial load
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        hydrateFromUserId(data.user.id);
+      } else {
+        clearSession();
+      }
+    });
+
+    // Re-hydrate whenever auth state actually changes
+    // (sign in, sign up, sign out, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        hydrateFromUserId(session.user.id);
+      } else if (event === "SIGNED_OUT") {
+        clearSession();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [setSession, clearSession]);
 
   return <>{children}</>;

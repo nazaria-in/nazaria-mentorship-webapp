@@ -6,6 +6,13 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createCalendarEvent } from "@/lib/google/calendar-events";
 import type { UserRole } from "@/types/users";
 import type { ExitSurveyTemplateEntry } from "@/types/exit-survey";
+import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning";
+
+
+
+import { notifyMeetingInvite, scheduleMeetingReminders } from "@/lib/notifications/meeting-notifications";
+import { scheduleExitSurveyReminders } from "@/lib/notifications/exit-survey-notifications";
+
 
 interface CreateMeetingRequestBody {
   title: string;
@@ -155,10 +162,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Meeting created but failed to add participants" }, { status: 500 });
   }
 
-  // Best-effort: create pending exit_surveys rows for this meeting. Failure
-  // here shouldn't fail meeting creation (already committed at this point),
-  // but IS logged loudly, and warnings (e.g. "no active template") are
-  // returned in the response so the client can surface them if it wants to.
+  // --- Meeting invite + reminder cascade notifications ---
+  // Fire-and-continue on failure: the meeting itself is already committed
+  // at this point, and a notification failure shouldn't fail the whole
+  // request. Errors are logged loudly instead.
+  const meetingForNotifications = {
+    id: meetingId,
+    title: meeting.title as string,
+    starts_at: meeting.starts_at as string,
+    ends_at: meeting.ends_at as string,
+    meet_link: meeting.meet_link as string | null,
+  };
+
+  for (const participantId of participantIds) {
+    try {
+      await notifyMeetingInvite(admin, meetingForNotifications, participantId, authUser.id);
+      await scheduleMeetingReminders(admin, meetingForNotifications, participantId);
+    } catch (notificationError) {
+      console.error("[meetings] Failed to notify/schedule reminders for participant", notificationError, {
+        meetingId,
+        participantId,
+      });
+    }
+  }
+
+  // --- Exit survey provisioning ---
+  // Uses the deduped, voice_prompt_label-aware, rowsCreated-returning
+  // implementation from lib/server/exit-survey-provisioning.ts. A previous
+  // version of this file had a SECOND, older copy of this function defined
+  // locally (returning only { warnings }, no rowsCreated) — that stale copy
+  // shadowed this import and silently broke the `result.rowsCreated > 0`
+  // check below, which is why exit-survey reminder notifications were never
+  // scheduled even after exit_surveys rows existed. Do not reintroduce a
+  // local copy of this function here.
   let exitSurveyWarnings: string[] = [];
   try {
     const result = await createPendingExitSurveys(meetingId, allUserIds);
@@ -166,89 +202,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (result.warnings.length > 0) {
       console.warn("[meetings] Exit survey provisioning warnings:", result.warnings, { meetingId });
     }
+
+    if (result.rowsCreated > 0) {
+      const { data: createdSurveyRows, error: createdSurveyRowsError } = await admin
+        .from("exit_surveys")
+        .select("id, user_id")
+        .eq("meeting_id", meetingId);
+
+      if (createdSurveyRowsError) {
+        console.error("[meetings] Failed to load created exit survey rows for reminder scheduling", createdSurveyRowsError, {
+          meetingId,
+        });
+      } else if (createdSurveyRows && createdSurveyRows.length > 0) {
+        await scheduleExitSurveyReminders(
+          admin,
+          createdSurveyRows.map((row) => ({
+            exitSurveyId: row.id as string,
+            submitterUserId: row.user_id as string,
+            meetingTitle: meeting.title as string,
+          })),
+          { startsAt: meeting.starts_at as string, endsAt: meeting.ends_at as string }
+        );
+      }
+    }
   } catch (exitSurveyError) {
     console.error("[meetings] Failed to create pending exit surveys", exitSurveyError, { meetingId });
     exitSurveyWarnings = ["Exit surveys could not be created for this meeting — see server logs."];
   }
 
   return NextResponse.json({ meeting, exitSurveyWarnings }, { status: 201 });
-}
-
-/**
- * One pending row per mentee for their own survey, plus one pending row
- * per (mentor, mentee) pair for that mentor's survey about that specific
- * mentee — this is what makes "mentor fills one exit survey per mentee in
- * the meeting" happen automatically. Uses whichever template is currently
- * marked active for each role; if a role has no active template yet, that
- * role's rows are simply skipped and added to the warnings array.
- */
-async function createPendingExitSurveys(
-  meetingId: string, 
-  participantIds: string[]
-): Promise<{ warnings: string[] }> {
-  const admin = supabaseAdmin;
-  const warnings: string[] = [];
-
-  const { data: profiles, error: profilesError } = await admin
-    .from("users")
-    .select("id, role")
-    .in("id", participantIds);
-  if (profilesError) throw new Error(profilesError.message);
-
-  const mentorIds = (profiles ?? []).filter((p) => p.role === "mentor").map((p) => p.id as string);
-  const menteeIds = (profiles ?? []).filter((p) => p.role === "mentee").map((p) => p.id as string);
-
-  if (mentorIds.length === 0 && menteeIds.length === 0) return { warnings };
-
-  const { data: templates, error: templatesError } = await admin
-    .from("exit_survey_templates")
-    .select("id, role, questions")
-    .in("role", ["mentor", "mentee"])
-    .eq("is_active", true);
-  if (templatesError) throw new Error(templatesError.message);
-
-  const mentorTemplate = (templates ?? []).find((t) => t.role === "mentor");
-  const menteeTemplate = (templates ?? []).find((t) => t.role === "mentee");
-
-  if (!mentorTemplate) {
-    warnings.push("No active mentor exit survey template — skipping mentor rows.");
-  }
-  
-  if (!menteeTemplate) {
-    warnings.push("No active mentee exit survey template — skipping mentee rows.");
-  }
-
-  const rows: Record<string, unknown>[] = [];
-
-  for (const menteeId of menteeIds) {
-    if (menteeTemplate) {
-      rows.push({
-        meeting_id: meetingId,
-        user_id: menteeId,
-        subject_user_id: menteeId,
-        user_role: "mentee",
-        template_id: menteeTemplate.id,
-        template_snapshot: menteeTemplate.questions as ExitSurveyTemplateEntry[],
-      });
-    }
-    if (mentorTemplate) {
-      for (const mentorId of mentorIds) {
-        rows.push({
-          meeting_id: meetingId,
-          user_id: mentorId,
-          subject_user_id: menteeId,
-          user_role: "mentor",
-          template_id: mentorTemplate.id,
-          template_snapshot: mentorTemplate.questions as ExitSurveyTemplateEntry[],
-        });
-      }
-    }
-  }
-
-  if (rows.length === 0) return { warnings };
-
-  const { error: insertError } = await admin.from("exit_surveys").insert(rows);
-  if (insertError) throw new Error(insertError.message);
-
-  return { warnings };
 }

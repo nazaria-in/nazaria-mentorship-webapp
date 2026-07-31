@@ -80,3 +80,21 @@ export interface ComposerDisabledState {
   disabled: boolean;
   reason: string | null;
 }
+
+export interface ConversationParticipantInput {
+  userId: string;
+  canMessage: boolean;
+}
+
+export interface CreateConversationInput {
+  participants: ConversationParticipantInput[];
+  name: string; // required — no more silent fallback-to-null
+  kind: ConversationKind;
+  podId?: string; // required when kind === "pod", stamped onto conversations.pod_id
+}
+
+export interface PodOption {
+  podId: string;
+  podName: string;
+  cohortId: string;
+}

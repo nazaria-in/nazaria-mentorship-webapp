@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { CohortsTab } from "@/components/admin/CohortsTab";
-import { PeopleTab } from "@/components/shared/PeopleTab";
+import { PeopleTab } from "@/components/admin/PeopleTab";
 
 type Tab = "people" | "cohorts";
 
