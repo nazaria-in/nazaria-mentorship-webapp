@@ -13,22 +13,32 @@ interface EnterConversationBannerProps {
 
 export function EnterConversationBanner({ conversationId, onEntered }: EnterConversationBannerProps) {
   const [entering, setEntering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleEnter() {
     setEntering(true);
+    setError(null);
     try {
       await enterConversationAsStaff(conversationId);
       onEntered();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't enter this conversation.");
     } finally {
       setEntering(false);
     }
   }
 
   return (
-    <div className="border-t border-border dark:border-border bg-card dark:bg-card px-4 py-3 flex items-center justify-between gap-3">
-      <p className="text-sm text-text-muted dark:text-text-muted">
-        You&apos;re viewing this conversation as staff. Enter to send messages and appear as a participant.
-      </p>
+    <div className="border-t border-border-strong dark:border-border-strong bg-card dark:bg-card px-4 py-3 flex items-center justify-between gap-3">
+      <div>
+        <p className="text-sm text-text-primary dark:text-text-primary">
+          You&apos;re viewing this conversation as staff.
+        </p>
+        <p className="text-xs text-text-muted dark:text-text-muted">
+          Enter to appear as a participant, or just send a message below — you&apos;ll join automatically.
+        </p>
+        {error && <p className="text-xs text-destructive dark:text-destructive mt-1">{error}</p>}
+      </div>
       <button
         type="button"
         onClick={() => void handleEnter()}

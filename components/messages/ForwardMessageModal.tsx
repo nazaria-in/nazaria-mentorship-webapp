@@ -17,22 +17,24 @@ interface ForwardMessageModalProps {
 export function ForwardMessageModal({ message, isOpen, onClose }: ForwardMessageModalProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [forwarding, setForwarding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleSelection(conversationId: string) {
     setSelectedIds((prev) =>
-      prev.includes(conversationId)
-        ? prev.filter((id) => id !== conversationId)
-        : [...prev, conversationId]
+      prev.includes(conversationId) ? prev.filter((id) => id !== conversationId) : [...prev, conversationId]
     );
   }
 
   async function handleForward() {
     if (selectedIds.length === 0) return;
     setForwarding(true);
+    setError(null);
     try {
       await forwardMessage(message, selectedIds);
       onClose();
       setSelectedIds([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't forward this message.");
     } finally {
       setForwarding(false);
     }
@@ -44,10 +46,9 @@ export function ForwardMessageModal({ message, isOpen, onClose }: ForwardMessage
         <div className="flex-1 overflow-hidden">
           <ConversationsListPanel pickerMode onSelectForForward={toggleSelection} />
         </div>
-        <div className="border-t border-border dark:border-border pt-3 flex items-center justify-between">
-          <span className="text-sm text-text-muted dark:text-text-muted">
-            {selectedIds.length} selected
-          </span>
+        {error && <p className="text-sm text-destructive dark:text-destructive pt-2">{error}</p>}
+        <div className="border-t border-border-strong dark:border-border-strong pt-3 flex items-center justify-between">
+          <span className="text-sm text-text-muted dark:text-text-muted">{selectedIds.length} selected</span>
           <button
             type="button"
             onClick={() => void handleForward()}

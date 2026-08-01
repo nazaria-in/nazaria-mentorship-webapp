@@ -44,6 +44,12 @@ export function AssignmentFormModal({
   const [dueAt, setDueAt] = React.useState("");
   const [locallyRemovedIds, setLocallyRemovedIds] = React.useState<Set<string>>(new Set());
 
+  // AssignmentCard already shows its own "this assignment has started" warning
+  // and only calls onEdit() (which opens this modal) once the user confirms.
+  // So by the time we're here in edit mode, that confirmation has already
+  // happened — structural fields should be unlocked, not gated a second time.
+  const structuralEditUnlocked = mode === "edit";
+
   const { data: existingAssignment, isLoading: loadingAssignment } = useQuery({
     queryKey: ["assignment", assignmentId],
     queryFn: () => fetchAssignment(assignmentId!),
@@ -141,6 +147,7 @@ export function AssignmentFormModal({
           <AssignmentTemplateForm
             mode={mode}
             initialValues={mode === "edit" ? existingAssignment : undefined}
+            allowStructuralEdit={structuralEditUnlocked}
             createdBy={currentUserId}
             onSaved={(assignment) => {
               setWorkingAssignment(assignment);

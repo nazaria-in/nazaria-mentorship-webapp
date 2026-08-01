@@ -4,9 +4,9 @@
 
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
-import { createAssignment, updateAssignment } from "@/lib/api/assignments";
+import { createAssignment, updateAssignment, addSlot, updateSlot, deleteSlot } from "@/lib/api/assignments";
 import { SubmissionSlotEditor, type DraftSlot } from "@/components/assignments/SubmissionSlotEditor";
-import type { AssignmentWithSlots } from "@/types/assignments";
+import type { AssignmentWithSlots, AssignmentSubmissionSlot } from "@/types/assignments";
 
 export interface AssignmentTemplateFormProps {
   mode: "create" | "edit";
@@ -14,9 +14,10 @@ export interface AssignmentTemplateFormProps {
   createdBy: string;
   onSaved: (assignment: AssignmentWithSlots) => void;
   onCancel?: () => void;
+  allowStructuralEdit: boolean;
 }
 
-export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved, onCancel }: AssignmentTemplateFormProps) {
+export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved, onCancel, allowStructuralEdit }: AssignmentTemplateFormProps) {
   const [title, setTitle] = React.useState(initialValues?.title ?? "");
   const [description, setDescription] = React.useState(initialValues?.description ?? "");
   const [instructions, setInstructions] = React.useState(initialValues?.instructions ?? "");
@@ -31,11 +32,56 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
 
   // Lock editing if the assignment has already started
   const hasStarted = mode === "edit" && !!initialValues && initialValues.start_date <= new Date().toISOString().slice(0, 10);
+  const slotsLocked = hasStarted && !allowStructuralEdit;
 
   const isDateRangeValid = React.useMemo(() => {
     if (!startDate || !endDate) return true; // end date is optional; nothing to compare until both are set
     return endDate >= startDate; // yyyy-MM-dd strings compare correctly lexicographically
   }, [startDate, endDate]);
+
+  // Persists slot add/update/delete against assignment_submission_slots for
+  // an existing assignment, and returns the final slot list with real DB ids.
+  // updateAssignment() never touches this table, so this has to happen
+  // separately alongside it.
+  async function syncSlots(assignmentId: string): Promise<AssignmentSubmissionSlot[]> {
+    const existingById = new Map((initialValues?.slots ?? []).map((s) => [s.id, s]));
+    const currentIds = new Set(slots.map((s) => s.id));
+
+    const results: AssignmentSubmissionSlot[] = [];
+
+    for (let i = 0; i < slots.length; i++) {
+      const draft = slots[i];
+      const existing = existingById.get(draft.id);
+
+      if (existing) {
+        const patch: Partial<Pick<AssignmentSubmissionSlot, "title" | "order_index" | "max_versions">> = {};
+        if (existing.title !== draft.title) patch.title = draft.title;
+        if (existing.order_index !== i) patch.order_index = i;
+        if (existing.max_versions !== draft.max_versions) patch.max_versions = draft.max_versions;
+
+        if (Object.keys(patch).length > 0) {
+          results.push(await updateSlot(existing.id, patch));
+        } else {
+          results.push(existing);
+        }
+      } else {
+        // Not in initialValues.slots → this is a new slot added client-side
+        results.push(
+          await addSlot({
+            assignment_id: assignmentId,
+            title: draft.title,
+            order_index: i,
+            max_versions: draft.max_versions,
+          })
+        );
+      }
+    }
+
+    const removed = (initialValues?.slots ?? []).filter((s) => !currentIds.has(s.id));
+    await Promise.all(removed.map((s) => deleteSlot(s.id)));
+
+    return results;
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -60,7 +106,8 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
         start_date: startDate,
         end_date: endDate || null,
       });
-      return { ...updated, slots: initialValues!.slots };
+      const syncedSlots = slotsLocked ? initialValues!.slots : await syncSlots(initialValues!.id);
+      return { ...updated, slots: syncedSlots };
     },
     onSuccess: (result) => onSaved(result),
   });
@@ -81,7 +128,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
         if (canSubmit) mutation.mutate();
       }}
     >
-      {hasStarted && (
+      {hasStarted && !allowStructuralEdit && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground font-medium backdrop-blur-sm">
           This assignment has started. The timeline schedules and template slots cannot be modified.
         </div>
@@ -92,7 +139,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          disabled={hasStarted}
+          disabled={hasStarted && !allowStructuralEdit}
           className={inputClass}
           placeholder="e.g. Week 3 — Character study"
         />
@@ -102,7 +149,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          disabled={hasStarted}
+          disabled={hasStarted && !allowStructuralEdit}
           rows={2}
           className={inputClass}
           placeholder="Provide a short overview summary..."
@@ -113,7 +160,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
         <textarea
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          disabled={hasStarted}
+          disabled={hasStarted && !allowStructuralEdit}
           rows={3}
           className={inputClass}
           placeholder="Detailed submission pipeline guide, criteria requirements..."
@@ -131,7 +178,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
               // keep due date in sync if it's now before the new start date
               setEndDate((prevEnd) => (prevEnd && prevEnd < next ? next : prevEnd));
             }}
-            disabled={hasStarted}
+            disabled={hasStarted && !allowStructuralEdit}
             className={inputClass}
           />
         </Field>
@@ -140,7 +187,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            disabled={hasStarted}
+            disabled={hasStarted && !allowStructuralEdit}
             min={startDate || undefined}
             aria-invalid={!isDateRangeValid}
             className={`${inputClass} aria-[invalid=true]:border-destructive aria-[invalid=true]:focus:border-destructive`}
@@ -157,7 +204,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
           type="number"
           value={weekNumber}
           onChange={(e) => setWeekNumber(e.target.value)}
-          disabled={hasStarted}
+          disabled={hasStarted && !allowStructuralEdit}
           className={inputClass}
           placeholder="e.g. 3"
         />
@@ -165,8 +212,8 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
 
       <div className="space-y-2 mt-2">
         <p className="text-xs font-semibold tracking-wide uppercase text-text-primary/80">Submission slots</p>
-        <div className={hasStarted ? "opacity-65 pointer-events-none" : ""}>
-          <SubmissionSlotEditor slots={slots} onChange={setSlots} disabled={hasStarted} />
+        <div className={slotsLocked ? "opacity-65 pointer-events-none" : ""}>
+          <SubmissionSlotEditor slots={slots} onChange={setSlots} disabled={slotsLocked} />
         </div>
       </div>
 
@@ -188,7 +235,7 @@ export function AssignmentTemplateForm({ mode, initialValues, createdBy, onSaved
         )}
         <button
           type="submit"
-          disabled={!canSubmit || mutation.isPending || hasStarted}
+          disabled={!canSubmit || mutation.isPending || (hasStarted && !allowStructuralEdit)}
           className="rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-95 disabled:bg-muted disabled:text-text-primary/40 disabled:border-transparent disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           {mutation.isPending ? "Saving changes..." : mode === "create" ? "Create assignment" : "Save changes"}

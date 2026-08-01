@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Megaphone, Users, User, LogIn, Eye } from "lucide-react";
+import { Megaphone, Users, UsersRound, User, LogIn, Eye } from "lucide-react";
 import { useOversightConversations } from "@/hooks/use-conversations";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { enterConversationAsStaff } from "@/lib/api/messages";
@@ -13,6 +13,7 @@ function KindIcon({ kind }: { kind: ConversationKind }) {
   const className = "h-4 w-4 text-text-muted dark:text-text-muted";
   if (kind === "broadcast") return <Megaphone className={className} />;
   if (kind === "pod") return <Users className={className} />;
+  if (kind === "group") return <UsersRound className={className} />;
   return <User className={className} />;
 }
 
@@ -32,9 +33,7 @@ export function StaffConversationDirectory() {
   }
 
   if (!conversations || conversations.length === 0) {
-    return (
-      <EmptyState title="No conversations yet" description="Nothing has been created across the platform." />
-    );
+    return <EmptyState title="No conversations yet" description="Nothing has been created across the platform." />;
   }
 
   return (
@@ -45,10 +44,10 @@ export function StaffConversationDirectory() {
           onClick={() => router.push(`/chat/${conversation.conversation_id}`)}
           className={cn(
             "flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors",
-            "hover:bg-card-alt dark:hover:bg-card-alt bg-card dark:bg-card border border-border dark:border-border"
+            "hover:bg-card-alt dark:hover:bg-card-alt bg-card dark:bg-card border border-border-strong dark:border-border-strong"
           )}
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface dark:bg-surface border border-border dark:border-border">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface dark:bg-surface border border-border-strong dark:border-border-strong">
             <KindIcon kind={conversation.kind} />
           </div>
 
