@@ -10,6 +10,7 @@ import { MeetingFormModal } from "@/components/meetings/MeetingFormModal";
 import { AcceptDeclineControls } from "@/components/meetings/AcceptDeclineControls";
 import { meetingToTimelineEvent } from "@/components/meetings/meeting-timeline-adapter";
 import { fetchMeetingsInRange, fetchPendingInvitesForUser } from "@/lib/api/meetings";
+import { PendingExitSurveysWidget } from "@/components/exit-survey/PendingExitSurveysWidget";
 import { useRole } from "@/providers/role-provider";
 // TODO(Joseph): swap for your actual current-user hook if the field name differs
 import { useSessionStore } from "@/store/session-store";
@@ -17,6 +18,9 @@ import type { TimelineEvent } from "@/types/timeline";
 
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 
+// Same roles that get the widget on /dashboard — staff get their own
+// org-wide analytics section elsewhere, not this personal list.
+const ROLES_WITH_OWN_PENDING_SURVEYS = ["mentee", "mentor"] as const;
 
 export default function MeetingsPage(): React.JSX.Element {
   const { role, permissionLevel, isDebug } = useRole();
@@ -30,6 +34,8 @@ export default function MeetingsPage(): React.JSX.Element {
   // mode skips the "not logged in" gate, so layout can be checked without a
   // real session. Any real (non-debug) visit still requires a session.
   const isDebugStaffPreview = isDebug && (role === "pm" || role === "associate");
+
+  const showOwnPendingSurveys = role !== null && (ROLES_WITH_OWN_PENDING_SURVEYS as readonly string[]).includes(role);
 
   const handleRangeChange = React.useCallback((rangeStartIso: string, rangeEndIso: string) => {
     setRange({ start: rangeStartIso, end: rangeEndIso });
@@ -87,6 +93,11 @@ export default function MeetingsPage(): React.JSX.Element {
           + Schedule meeting
         </button>
       </div>
+
+      {/* Collapsed by default, badge-only when closed — mounted above the
+          calendar (never inline with it) so it can never push meeting
+          content around or compete for attention with the timeline. */}
+      {showOwnPendingSurveys && userId && <PendingExitSurveysWidget userId={userId} />}
 
       {(pendingInvitesQuery.data?.length ?? 0) > 0 && userId && (
         <div className="flex flex-col gap-2">

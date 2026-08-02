@@ -2,6 +2,18 @@
 
 import type { ExitSurveyAiAnalysis, ExitSurveyEntry } from "@/types/exit-survey";
 
+/** Thrown by transcribeAudio — carries the HTTP status so callers can
+ * distinguish "service is busy/out of quota" from other failures without
+ * parsing message text. */
+export class TranscribeError extends Error {
+  status: number | null;
+  constructor(message: string, status: number | null) {
+    super(message);
+    this.name = "TranscribeError";
+    this.status = status;
+  }
+}
+
 /**
  * Posts the recorded audio blob (plus answers so far) to the transcribe
  * route and gets back the full analysis in one call. Audio is never
@@ -26,7 +38,7 @@ export async function transcribeAudio(
       body && typeof body === "object" && typeof (body as Record<string, unknown>).error === "string"
         ? (body as { error: string }).error
         : `Transcription failed (${response.status}).`;
-    throw new Error(message);
+    throw new TranscribeError(message, response.status);
   }
 
   const data: unknown = await response.json();
@@ -36,8 +48,20 @@ export async function transcribeAudio(
     typeof (data as Record<string, unknown>).transcript !== "string" ||
     typeof (data as Record<string, unknown>).summary !== "string"
   ) {
-    throw new Error("Transcription response was malformed.");
+    throw new TranscribeError("Transcription response was malformed.", null);
   }
 
   return data as ExitSurveyAiAnalysis;
+}
+
+/** Status codes / message fragments that typically mean "the AI provider
+ * is overloaded or we're out of quota" rather than a real client error. */
+const BUSY_STATUS_CODES = new Set([429, 503, 502, 504]);
+const BUSY_MESSAGE_HINTS = ["overloaded", "quota", "rate limit", "rate-limited", "capacity", "unavailable"];
+
+export function isTranscribeServiceBusy(error: unknown): boolean {
+  if (!(error instanceof TranscribeError)) return false;
+  if (error.status !== null && BUSY_STATUS_CODES.has(error.status)) return true;
+  const lower = error.message.toLowerCase();
+  return BUSY_MESSAGE_HINTS.some((hint) => lower.includes(hint));
 }

@@ -3,13 +3,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, Users } from "lucide-react";
+import { GraduationCap, ShieldCheck, Users } from "lucide-react";
 
 import { setUserRole } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
 import { cn } from "@/lib/utils";
 
 import type { UserRole } from "@/types/users";
+
+// Roles that require PM approval before the user gets product access.
+// Both mentor and associate applications are reviewed manually — only
+// mentee signups skip straight to profile setup.
+const ROLES_REQUIRING_APPROVAL: readonly UserRole[] = ["mentor", "associate"];
 
 export function RoleChoice() {
   const router = useRouter();
@@ -38,7 +43,7 @@ export function RoleChoice() {
       setRole(selected);
 
       router.push(
-        selected === "mentor"
+        ROLES_REQUIRING_APPROVAL.includes(selected)
           ? "/onboarding/not-approved"
           : "/onboarding/profile"
       );
@@ -59,7 +64,7 @@ export function RoleChoice() {
         You can&apos;t change this later without contacting your program manager.
       </p>
 
-      <div className="mt-7 grid gap-3 sm:grid-cols-2">
+      <div className="mt-7 grid gap-3 sm:grid-cols-3">
         <RoleCard
           icon={<GraduationCap className="h-5 w-5" />}
           title="I'm a student"
@@ -73,6 +78,13 @@ export function RoleChoice() {
           description="Apply to guide a pod. Requires PM approval before you get access."
           active={selected === "mentor"}
           onClick={() => setSelected("mentor")}
+        />
+        <RoleCard
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="I'm an associate"
+          description="Help run the program. Requires PM approval before you get access."
+          active={selected === "associate"}
+          onClick={() => setSelected("associate")}
         />
       </div>
 

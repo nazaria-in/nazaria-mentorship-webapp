@@ -210,7 +210,6 @@ export default function ConversationThreadPage() {
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={() => void fetchNextPage()}
           onReply={setReplyingTo}
-          onForward={setForwardTarget}
           onDelete={(id) => void handleDelete(id)}
           onRetry={(m) => void handleRetry(m)}
           canDeleteMessage={canDeleteMessage}

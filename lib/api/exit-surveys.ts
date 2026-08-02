@@ -172,6 +172,8 @@ export interface PendingExitSurvey {
   startsAt: string;
   endsAt: string;
   meetingStatus: string;
+  /** When this exit_surveys row was created (i.e. when the meeting was created — rows are pre-created, not created on submit). */
+  createdAt: string;
 }
 
 export async function fetchPendingExitSurveys(userId: string): Promise<PendingExitSurvey[]> {
@@ -193,7 +195,20 @@ export async function fetchPendingExitSurveys(userId: string): Promise<PendingEx
     startsAt: row.starts_at as string,
     endsAt: row.ends_at as string,
     meetingStatus: row.meeting_status as string,
+    createdAt: row.created_at as string,
   }));
+}
+
+/**
+ * All currently-pending (submitted_at IS NULL, past the 80% threshold)
+ * exit surveys for one specific user — used by the staff drill-down (e.g.
+ * AboutMenteeBlock/AboutMentorBlock) to list a person's outstanding
+ * surveys with their createdAt. Distinct from fetchPendingExitSurveys only
+ * in intent/naming — same underlying view and shape, kept as its own
+ * export so staff call sites read clearly at the call site.
+ */
+export async function fetchPendingExitSurveysForUser(userId: string): Promise<PendingExitSurvey[]> {
+  return fetchPendingExitSurveys(userId);
 }
 
 /** Merges v_exit_survey_context (pod + mentor names) onto already-fetched detail rows. */

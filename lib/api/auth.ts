@@ -1,5 +1,9 @@
+// lib/api/auth.ts
+
 import { createClient } from "@/lib/supabase/client";
+import { useSessionStore } from "@/store/session-store";
 import type { UserRole } from "@/types/users";
+import type { Role } from "@/providers/role-provider";
 
 /**
  * All functions here run in the browser (client component context).
@@ -68,7 +72,8 @@ export async function signIn({ email, password }: SignInInput) {
 /**
  * Called from the onboarding role-choice step.
  * - mentee: role set, approval_status left at its default ('approved')
- * - mentor: role set, approval_status explicitly flipped to 'pending'
+ * - mentor / associate: role set, approval_status explicitly flipped to
+ *   'pending' — both require PM sign-off before the user gets access.
  */
 export async function setUserRole(userId: string, role: UserRole) {
   const supabase = createClient();
@@ -124,4 +129,45 @@ export async function updateUserProfile({
     .eq("id", userId);
 
   if (error) throw error;
+}
+
+/**
+ * Re-fetches the current auth user + their public.users profile row and
+ * writes it straight into the session store (bypassing React state/props,
+ * via zustand's getState()/setSession so it's callable from anywhere,
+ * not just inside a component tied to SessionProvider).
+ *
+ * Returns the resolved userId, or null if:
+ * - there's no authenticated user (session store is cleared in this case), or
+ * - the profile row isn't found yet — existing session state is left
+ *   untouched here so callers (e.g. role-choice's retry loop) can try again
+ *   instead of getting bounced to a cleared session mid-retry.
+ */
+export async function refetchSession(): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  const authUser = data.user;
+
+  if (!authUser) {
+    useSessionStore.getState().clearSession();
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("id, role, full_name")
+    .eq("id", authUser.id)
+    .single();
+
+  if (!profile) {
+    return null;
+  }
+
+  useSessionStore.getState().setSession({
+    userId: profile.id,
+    fullName: profile.full_name ?? "Anonymous User",
+    role: profile.role as Role,
+  });
+
+  return profile.id;
 }

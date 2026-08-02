@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
-import { transcribeAudio } from "@/lib/api/exit-survey-transcribe";
+import { transcribeAudio, isTranscribeServiceBusy } from "@/lib/api/exit-survey-transcribe";
 import type {
   ExitSurveyConcernTag,
   ExitSurveyEntry,
@@ -29,6 +29,9 @@ interface ExitSurveyFormProps {
 type AnswerValue = string | string[] | number;
 
 const TRANSCRIPT_REQUIRED_ROLES: ExitSurveyRole[] = ["mentor"];
+
+const FRIENDLY_BUSY_MESSAGE =
+  "Something went wrong on our end and the voice note couldn't be processed right now — please type your note instead.";
 
 export function ExitSurveyForm({
   exitSurveyId,
@@ -57,6 +60,11 @@ export function ExitSurveyForm({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Friendly message shown when the AI transcription service is busy/out
+  // of quota — rendered near both the recorder and the submit button so
+  // it's visible wherever the person's attention currently is.
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const recorder = useAudioRecorder();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -96,6 +104,7 @@ export function ExitSurveyForm({
       recorder.stop();
       return;
     }
+    setAiError(null);
     await recorder.start();
   }
 
@@ -106,8 +115,9 @@ export function ExitSurveyForm({
   async function handleUseRecording() {
     if (!recorder.audioBlob) return;
     setError(null);
+    setAiError(null);
     setIsTranscribing(true);
-    
+
     try {
       const result = await transcribeAudio(recorder.audioBlob, buildAnswersPayload());
       setTranscript(result.transcript);
@@ -118,17 +128,19 @@ export function ExitSurveyForm({
       setConcernTags(result.concernTags);
       setNeedsFollowUp(result.needsFollowUp);
       setFollowUpUrgency(result.followUpUrgency);
-      
+
       // Cleanup (replacing finally block due to React Compiler limitations)
       setIsTranscribing(false);
       recorder.reset();
     } catch (transcribeError) {
-      setError(
-        transcribeError instanceof Error
-          ? transcribeError.message
-          : "Couldn't transcribe that recording. Try again or type your note instead."
+      setAiError(
+        isTranscribeServiceBusy(transcribeError)
+          ? FRIENDLY_BUSY_MESSAGE
+          : transcribeError instanceof Error
+            ? transcribeError.message
+            : "Couldn't transcribe that recording. Try again or type your note instead."
       );
-      
+
       // Cleanup (replacing finally block due to React Compiler limitations)
       setIsTranscribing(false);
       recorder.reset();
@@ -165,7 +177,7 @@ export function ExitSurveyForm({
     }
 
     setIsSubmitting(true);
-    
+
     try {
       await onSubmit({
         exitSurveyId,
@@ -180,12 +192,12 @@ export function ExitSurveyForm({
         needsFollowUp: needsFollowUp || undefined,
         followUpUrgency: followUpUrgency !== "none" ? followUpUrgency : undefined,
       });
-      
+
       // Cleanup (replacing finally block due to React Compiler limitations)
       setIsSubmitting(false);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to submit survey.");
-      
+
       // Cleanup (replacing finally block due to React Compiler limitations)
       setIsSubmitting(false);
     }
@@ -230,8 +242,19 @@ export function ExitSurveyForm({
             type="button"
             onClick={handleRecordToggle}
             disabled={recorder.status === "requesting_permission" || isTranscribing}
-            className="w-fit rounded-lg border border-border bg-card-alt px-4 py-2 text-sm text-text-primary disabled:opacity-60 dark:border-border dark:bg-card-alt dark:text-text-primary"
+            className={`relative flex w-fit items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-all duration-200 disabled:opacity-60 ${
+              recorder.status === "recording"
+                ? "border-destructive/40 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/10 dark:text-destructive"
+                : "border-border bg-card-alt text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
+            }`}
           >
+            {recorder.status === "recording" && (
+              <span className="flex h-3.5 items-center gap-0.5">
+                <span className="h-full w-0.5 animate-[bounce_1s_infinite_100ms] rounded-full bg-destructive" />
+                <span className="h-full w-0.5 animate-[bounce_1s_infinite_300ms] rounded-full bg-destructive" />
+                <span className="h-full w-0.5 animate-[bounce_1s_infinite_200ms] rounded-full bg-destructive" />
+              </span>
+            )}
             {recorder.status === "recording"
               ? "Stop recording"
               : recorder.status === "requesting_permission"
@@ -272,6 +295,8 @@ export function ExitSurveyForm({
           <p className="text-sm text-text-muted dark:text-text-muted">{recorder.errorMessage}</p>
         )}
 
+        {aiError && <p className="text-sm text-destructive dark:text-destructive">{aiError}</p>}
+
         <textarea
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
@@ -287,6 +312,7 @@ export function ExitSurveyForm({
       <SignalPicker value={signal} onChange={setSignal} />
 
       {error && <p className="text-sm text-destructive dark:text-destructive">{error}</p>}
+      {aiError && <p className="text-sm text-destructive dark:text-destructive">{aiError}</p>}
 
       <button
         type="button"

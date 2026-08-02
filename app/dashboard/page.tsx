@@ -12,6 +12,7 @@ import { fetchMeetingsInRange } from "@/lib/api/meetings";
 import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TimelineElement } from "@/components/shared/TimelineElement";
+import { PendingExitSurveysWidget } from "@/components/exit-survey/PendingExitSurveysWidget";
 import { useState, useMemo } from "react";
 import { TimelineElementDetailsModal } from "@/components/shared/TimelineElementDetailsModal";
 import type { Assignment } from "@/types/assignments";
@@ -33,10 +34,17 @@ interface SelectedAssignmentItem {
 
 type SelectedItemState = SelectedMeetingItem | SelectedAssignmentItem;
 
+// Roles that see their own "unfilled exit surveys" widget on the
+// dashboard. Staff get an org-wide analytics section instead (built
+// separately, in the admin dashboard) rather than a personal task list.
+const ROLES_WITH_OWN_PENDING_SURVEYS = ["mentee", "mentor"] as const;
+
 export default function DashboardPage() {
   const { permissionLevel, role } = useRole();
   const userId = useSessionStore((s) => s.userId);
   const [selectedItem, setSelectedItem] = useState<SelectedItemState | null>(null);
+
+  const showOwnPendingSurveys = role !== null && (ROLES_WITH_OWN_PENDING_SURVEYS as readonly string[]).includes(role);
 
   // Compute a valid week boundary window for our API range rules
   const { rangeStart, rangeEnd } = useMemo(() => {
@@ -68,7 +76,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">
-        <DashboardGreeting />
+        {showOwnPendingSurveys && <PendingExitSurveysWidget userId={userId} />}
 
         {/* Dual-Track Timeline Summary Grid */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -222,18 +230,5 @@ export default function DashboardPage() {
         </TimelineElementDetailsModal>
       )}
     </>
-  );
-}
-
-function DashboardGreeting() {
-  const { role } = useRole();
-  const fullName = useSessionStore((s) => s.fullName);
-  return (
-    <div>
-      <h1 className="font-heading text-xl font-semibold text-text-primary dark:text-text-primary">
-        Welcome{fullName ? `, ${fullName}` : ""}
-      </h1>
-      <p className="text-sm text-text-primary/60 dark:text-text-primary/60">Viewing as workspace {role}.</p>
-    </div>
   );
 }

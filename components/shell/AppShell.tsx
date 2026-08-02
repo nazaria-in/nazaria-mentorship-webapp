@@ -7,9 +7,10 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Moon, Sun, MoreHorizontal, X } from "lucide-react";
+import { Moon, Sun, MoreHorizontal, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
+import { PageDescriptionShell } from "@/components/shell/PageDescriptionShell";
 import { useRole } from "@/providers/role-provider";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useSessionStore } from "@/store/session-store";
@@ -33,6 +34,13 @@ export interface AppShellProps {
   onOpenMessages?: () => void;
   avatar?: React.ReactNode;
   globalSearch?: React.ReactNode;
+  /**
+   * Short blurb explaining what this page is for. Rendered via
+   * PageDescriptionShell inside the scrollable <main>, above children —
+   * scrolls away with the rest of the content rather than staying pinned
+   * like the header above it.
+   */
+  pageDescription?: React.ReactNode;
 }
 
 // Bottom nav fits 4 icon+label items comfortably at mobile widths before
@@ -56,6 +64,7 @@ export function AppShell({
   unreadMessageCount = 0,
   avatar,
   globalSearch,
+  pageDescription,
 }: AppShellProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -117,6 +126,20 @@ export function AppShell({
         </div>
 
         <div className="flex flex-col items-center gap-3.5">
+          <Link
+            href="/profile"
+            title="Profile"
+            aria-current={pathname?.startsWith("/profile") ? "page" : undefined}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+              pathname?.startsWith("/profile")
+                ? "bg-primary text-primary-foreground"
+                : "text-text-primary/70 hover:bg-surface-muted dark:text-text-primary/60 dark:hover:bg-white/5"
+            )}
+            aria-label="Profile"
+          >
+            <User className="h-4 w-4" />
+          </Link>
           <button
             type="button"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -161,7 +184,10 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</main>
+        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+          {pageDescription && <PageDescriptionShell/>}
+          {children}
+        </main>
       </div>
 
       {/* Mobile bottom nav */}

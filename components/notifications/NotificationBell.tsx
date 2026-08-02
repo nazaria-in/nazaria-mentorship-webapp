@@ -29,6 +29,12 @@ const QUICK_FILTER_TYPES: Record<QuickFilter, NotificationType[] | null> = {
   messages: ["message"],
 };
 
+// Fallback poll interval. The realtime subscription below is the primary
+// update path; this exists purely to recover from missed/dropped realtime
+// events (e.g. tab backgrounded, websocket reconnect gap) without requiring
+// the user to click the bell or refresh the page.
+const POLL_INTERVAL_MS = 60_000;
+
 export function NotificationBell({ userId }: NotificationBellProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -112,6 +118,26 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       controller.abort();
       void supabase.removeChannel(channel);
     };
+  }, [userId, isOpen, refreshUnreadCount, loadNotifications]);
+
+  // Polling fallback: re-checks unread count every POLL_INTERVAL_MS, and
+  // also refreshes the loaded list if the dropdown is currently open.
+  // Independent of the realtime effect above so a realtime reconnect
+  // churn doesn't reset this timer's cadence.
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      // Only poll while the tab is actually visible, to avoid burning
+      // requests (and Supabase quota) on backgrounded tabs.
+      if (document.visibilityState !== "visible") return;
+      void refreshUnreadCount();
+      if (isOpen) void loadNotifications();
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
   }, [userId, isOpen, refreshUnreadCount, loadNotifications]);
 
   useEffect(() => {

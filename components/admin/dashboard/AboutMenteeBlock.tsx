@@ -2,7 +2,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { fetchMenteeOverview } from "@/lib/api/admin-scope-details";
+import { fetchPendingExitSurveysForUser } from "@/lib/api/exit-surveys";
 import type { AdminScope } from "@/lib/api/admin-scope";
 
 const SIGNAL_DOT: Record<string, string> = {
@@ -15,6 +17,11 @@ export function AboutMenteeBlock({ scope }: { scope: AdminScope }) {
   const { data, isLoading } = useQuery({
     queryKey: ["mentee-overview", scope.userId],
     queryFn: () => fetchMenteeOverview(scope),
+  });
+
+  const { data: pendingSurveys, isLoading: pendingSurveysLoading } = useQuery({
+    queryKey: ["exit-surveys", "pending", scope.userId],
+    queryFn: () => fetchPendingExitSurveysForUser(scope.userId),
   });
 
   if (isLoading || !data) {
@@ -79,6 +86,30 @@ export function AboutMenteeBlock({ scope }: { scope: AdminScope }) {
           </div>
         ) : (
           <p className="text-sm text-text-muted dark:text-text-muted">No submitted surveys yet</p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card sm:col-span-2">
+        <p className="text-xs text-text-muted dark:text-text-muted">Unfilled exit surveys</p>
+        {pendingSurveysLoading ? (
+          <p className="mt-1 text-sm text-text-muted dark:text-text-muted">Loading…</p>
+        ) : !pendingSurveys || pendingSurveys.length === 0 ? (
+          <p className="mt-1 text-sm text-text-primary dark:text-text-primary">None — all caught up.</p>
+        ) : (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            {pendingSurveys.map((survey) => (
+              <Link
+                key={survey.exitSurveyId}
+                href={`/exit-survey/${survey.exitSurveyId}`}
+                className="flex items-center justify-between gap-2 rounded-lg bg-card-alt px-2.5 py-1.5 text-xs hover:opacity-90 dark:bg-card-alt"
+              >
+                <span className="truncate text-text-primary dark:text-text-primary">{survey.title}</span>
+                <span className="shrink-0 text-text-muted dark:text-text-muted">
+                  {new Date(survey.createdAt).toLocaleDateString()}
+                </span>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -1,0 +1,4502 @@
+[
+  {
+    "database_export": {
+      "enums": [
+        {
+          "name": "aal_level",
+          "labels": [
+            "aal1",
+            "aal2",
+            "aal3"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "code_challenge_method",
+          "labels": [
+            "s256",
+            "plain"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "factor_status",
+          "labels": [
+            "unverified",
+            "verified"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "factor_type",
+          "labels": [
+            "totp",
+            "webauthn",
+            "phone"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "oauth_authorization_status",
+          "labels": [
+            "pending",
+            "approved",
+            "denied",
+            "expired"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "oauth_client_type",
+          "labels": [
+            "public",
+            "confidential"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "oauth_registration_type",
+          "labels": [
+            "dynamic",
+            "manual"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "oauth_response_type",
+          "labels": [
+            "code"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "one_time_token_type",
+          "labels": [
+            "confirmation_token",
+            "reauthentication_token",
+            "recovery_token",
+            "email_change_token_new",
+            "email_change_token_current",
+            "phone_change_token"
+          ],
+          "schema": "auth"
+        },
+        {
+          "name": "request_status",
+          "labels": [
+            "PENDING",
+            "SUCCESS",
+            "ERROR"
+          ],
+          "schema": "net"
+        },
+        {
+          "name": "approval_status",
+          "labels": [
+            "pending",
+            "approved",
+            "rejected"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "broadcast_audience",
+          "labels": [
+            "everyone",
+            "mentors",
+            "mentees"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "cohort_status",
+          "labels": [
+            "upcoming",
+            "active",
+            "completed"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "conversation_kind",
+          "labels": [
+            "direct",
+            "pod",
+            "broadcast",
+            "group"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "exit_survey_signal",
+          "labels": [
+            "green",
+            "yellow",
+            "red"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "exit_survey_urgency",
+          "labels": [
+            "none",
+            "soon",
+            "urgent"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "link_type",
+          "labels": [
+            "file",
+            "image",
+            "document",
+            "other"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "meeting_participant_status",
+          "labels": [
+            "pending",
+            "accepted",
+            "declined"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "meeting_status",
+          "labels": [
+            "scheduled",
+            "completed",
+            "cancelled"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "notification_delivery_status",
+          "labels": [
+            "pending",
+            "sent",
+            "failed"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "notification_type",
+          "labels": [
+            "meeting_invite",
+            "meeting_started",
+            "assignment_due",
+            "assignment_submitted",
+            "assignment_reviewed",
+            "exit_survey_pending",
+            "message",
+            "reminder",
+            "achievement"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "recurrence_type",
+          "labels": [
+            "none",
+            "daily",
+            "weekly",
+            "monthly"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "resource_course_type",
+          "labels": [
+            "handbook",
+            "toolkit",
+            "template",
+            "video",
+            "guide",
+            "external_course"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "resource_status",
+          "labels": [
+            "ongoing",
+            "paused",
+            "completed",
+            "abandoned"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "submission_status",
+          "labels": [
+            "pending_review",
+            "revision_requested",
+            "approved"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "user_role",
+          "labels": [
+            "pm",
+            "associate",
+            "mentor",
+            "mentee"
+          ],
+          "schema": "public"
+        },
+        {
+          "name": "action",
+          "labels": [
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "TRUNCATE",
+            "ERROR"
+          ],
+          "schema": "realtime"
+        },
+        {
+          "name": "equality_op",
+          "labels": [
+            "eq",
+            "neq",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "in",
+            "like",
+            "ilike",
+            "is",
+            "match",
+            "imatch",
+            "isdistinct"
+          ],
+          "schema": "realtime"
+        },
+        {
+          "name": "buckettype",
+          "labels": [
+            "STANDARD",
+            "ANALYTICS",
+            "VECTOR"
+          ],
+          "schema": "storage"
+        }
+      ],
+      "views": [
+        {
+          "name": "v_conversation_oversight",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT c.id AS conversation_id,\n    c.kind,\n    c.name,\n    c.description,\n    c.pod_id,\n    c.cohort_id,\n    c.audience,\n    c.last_message_at,\n    lm.body AS last_message_body,\n    lm.sender_id AS last_message_sender_id,\n    lm.created_at AS last_message_created_at,\n    lm.deleted_at AS last_message_deleted_at,\n    lm.deleted_by AS last_message_deleted_by,\n    (EXISTS ( SELECT 1\n           FROM conversation_participants cp\n          WHERE cp.conversation_id = c.id AND cp.user_id = auth.uid() AND cp.left_at IS NULL)) AS i_am_active_participant\n   FROM conversations c\n     LEFT JOIN LATERAL ( SELECT m.id,\n            m.body,\n            m.sender_id,\n            m.created_at,\n            m.deleted_at,\n            m.deleted_by\n           FROM messages m\n          WHERE m.conversation_id = c.id\n          ORDER BY m.created_at DESC\n         LIMIT 1) lm ON true;"
+        },
+        {
+          "name": "v_conversation_summary",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT c.id AS conversation_id,\n    c.kind,\n    c.name,\n    c.description,\n    c.pod_id,\n    c.cohort_id,\n    c.audience,\n    c.last_message_at,\n    cp.can_message AS my_can_message,\n    cp.last_read_at AS my_last_read_at,\n        CASE\n            WHEN lm.deleted_at IS NOT NULL THEN NULL::text\n            ELSE lm.body\n        END AS last_message_body,\n    lm.sender_id AS last_message_sender_id,\n    lm.created_at AS last_message_created_at,\n    lm.deleted_at AS last_message_deleted_at,\n    ( SELECT count(*) AS count\n           FROM messages m2\n          WHERE m2.conversation_id = c.id AND m2.created_at > COALESCE(cp.last_read_at, '1970-01-01 00:00:00+00'::timestamp with time zone) AND m2.sender_id <> auth.uid() AND m2.deleted_at IS NULL) AS unread_count,\n    ( SELECT array_agg(u.full_name) AS array_agg\n           FROM conversation_participants cp2\n             JOIN users u ON u.id = cp2.user_id\n          WHERE cp2.conversation_id = c.id AND cp2.user_id <> auth.uid() AND cp2.left_at IS NULL) AS other_participant_names\n   FROM conversations c\n     JOIN conversation_participants cp ON cp.conversation_id = c.id AND cp.user_id = auth.uid()\n     LEFT JOIN LATERAL ( SELECT m.id,\n            m.body,\n            m.sender_id,\n            m.created_at,\n            m.deleted_at\n           FROM messages m\n          WHERE m.conversation_id = c.id\n          ORDER BY m.created_at DESC\n         LIMIT 1) lm ON true\n  WHERE cp.left_at IS NULL;"
+        },
+        {
+          "name": "v_escalations",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT id AS exit_survey_id,\n    subject_user_id,\n    user_id AS reported_by,\n    signal,\n    follow_up_urgency,\n    needs_follow_up,\n    concern_tags,\n    created_at\n   FROM exit_surveys es\n  WHERE reviewed_at IS NULL AND (needs_follow_up = true OR signal = 'red'::exit_survey_signal OR (follow_up_urgency = ANY (ARRAY['soon'::exit_survey_urgency, 'urgent'::exit_survey_urgency])));"
+        },
+        {
+          "name": "v_exit_survey_context",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT es.id AS exit_survey_id,\n    p.id AS pod_id,\n    p.name AS pod_name,\n    COALESCE(( SELECT array_agg(DISTINCT mu.full_name) AS array_agg\n           FROM pod_members mpm\n             JOIN users mu ON mu.id = mpm.user_id AND mu.role = 'mentor'::user_role\n          WHERE mpm.pod_id = p.id), '{}'::text[]) AS mentor_names\n   FROM exit_surveys es\n     LEFT JOIN pod_members pm ON pm.user_id = es.subject_user_id\n     LEFT JOIN pods p ON p.id = pm.pod_id;"
+        },
+        {
+          "name": "v_mentee_assignment_status",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT ma.id AS mentee_assignment_id,\n    ma.assignment_id,\n    ma.mentee_id,\n    ma.due_at,\n    ma.is_completed,\n    count(DISTINCT s.id) AS total_slots,\n    count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'approved'::submission_status) AS approved_slots,\n    count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'pending_review'::submission_status) AS pending_slots,\n    count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'revision_requested'::submission_status) AS revision_slots,\n        CASE\n            WHEN count(DISTINCT s.id) = 0 THEN 'no_slots'::text\n            WHEN count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'approved'::submission_status) = count(DISTINCT s.id) THEN 'completed'::text\n            WHEN count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'pending_review'::submission_status) > 0 THEN 'pending_review'::text\n            WHEN count(DISTINCT ms.slot_id) FILTER (WHERE ms.status = 'revision_requested'::submission_status) > 0 THEN 'needs_revision'::text\n            ELSE 'not_started'::text\n        END AS completion_status\n   FROM mentee_assignments ma\n     LEFT JOIN assignment_submission_slots s ON s.assignment_id = ma.assignment_id\n     LEFT JOIN LATERAL ( SELECT DISTINCT ON (ms_1.slot_id) ms_1.slot_id,\n            ms_1.status\n           FROM mentee_submissions ms_1\n          WHERE ms_1.mentee_assignment_id = ma.id\n          ORDER BY ms_1.slot_id, ms_1.version_number DESC) ms ON true\n  GROUP BY ma.id, ma.assignment_id, ma.mentee_id, ma.due_at, ma.is_completed;"
+        },
+        {
+          "name": "v_mentor_stats",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " WITH mentor_pods AS (\n         SELECT up.user_id AS mentor_id,\n            up.pod_id\n           FROM v_user_pods up\n          WHERE up.role = 'mentor'::user_role\n        ), mentee_pods AS (\n         SELECT up.user_id AS mentee_id,\n            up.pod_id\n           FROM v_user_pods up\n          WHERE up.role = 'mentee'::user_role\n        ), mentor_mentees AS (\n         SELECT mp.mentor_id,\n            mep.mentee_id\n           FROM mentor_pods mp\n             JOIN mentee_pods mep ON mep.pod_id = mp.pod_id\n        ), assignment_rollup AS (\n         SELECT mm.mentor_id,\n            count(*) FILTER (WHERE vas.completion_status = 'completed'::text) AS completed_assignments,\n            count(*) AS total_assignments\n           FROM mentor_mentees mm\n             JOIN v_mentee_assignment_status vas ON vas.mentee_id = mm.mentee_id\n          GROUP BY mm.mentor_id\n        ), escalation_rollup AS (\n         SELECT mm.mentor_id,\n            count(*) AS open_escalations\n           FROM mentor_mentees mm\n             JOIN v_escalations ve ON ve.subject_user_id = mm.mentee_id\n          GROUP BY mm.mentor_id\n        )\n SELECT u.id AS mentor_id,\n    u.full_name AS mentor_name,\n    ( SELECT count(*) AS count\n           FROM mentor_mentees mm\n          WHERE mm.mentor_id = u.id) AS mentee_count,\n    COALESCE(ar.completed_assignments, 0::bigint) AS completed_assignments,\n    COALESCE(ar.total_assignments, 0::bigint) AS total_assignments,\n    COALESCE(er.open_escalations, 0::bigint) AS open_escalations_among_mentees\n   FROM users u\n     LEFT JOIN assignment_rollup ar ON ar.mentor_id = u.id\n     LEFT JOIN escalation_rollup er ON er.mentor_id = u.id\n  WHERE u.role = 'mentor'::user_role AND u.deleted_at IS NULL;"
+        },
+        {
+          "name": "v_pending_exit_surveys",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT es.id AS exit_survey_id,\n    es.user_id,\n    es.subject_user_id,\n    es.meeting_id,\n    m.title,\n    m.starts_at,\n    m.ends_at,\n    m.status AS meeting_status,\n    su.full_name AS subject_full_name\n   FROM exit_surveys es\n     JOIN meetings m ON m.id = es.meeting_id\n     LEFT JOIN users su ON su.id = es.subject_user_id\n  WHERE es.submitted_at IS NULL AND m.deleted_at IS NULL AND now() >= (m.starts_at + (m.ends_at - m.starts_at) * 0.8::double precision);"
+        },
+        {
+          "name": "v_pod_stats",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " WITH pod_roster AS (\n         SELECT p.id AS pod_id,\n            p.name AS pod_name,\n            p.cohort_id,\n            up.user_id,\n            up.role\n           FROM pods p\n             JOIN v_user_pods up ON up.pod_id = p.id\n          WHERE p.deleted_at IS NULL\n        ), assignment_rollup AS (\n         SELECT pr_1.pod_id,\n            count(*) FILTER (WHERE vas.completion_status = 'completed'::text) AS completed_assignments,\n            count(*) AS total_assignments\n           FROM pod_roster pr_1\n             JOIN v_mentee_assignment_status vas ON vas.mentee_id = pr_1.user_id\n          WHERE pr_1.role = 'mentee'::user_role\n          GROUP BY pr_1.pod_id\n        ), escalation_rollup AS (\n         SELECT pr_1.pod_id,\n            count(*) AS open_escalations\n           FROM pod_roster pr_1\n             JOIN v_escalations ve ON ve.subject_user_id = pr_1.user_id\n          GROUP BY pr_1.pod_id\n        )\n SELECT pr.pod_id,\n    pr.pod_name,\n    pr.cohort_id,\n    count(*) FILTER (WHERE pr.role = 'mentee'::user_role) AS mentee_count,\n    count(*) FILTER (WHERE pr.role = 'mentor'::user_role) AS mentor_count,\n    COALESCE(ar.completed_assignments, 0::bigint) AS completed_assignments,\n    COALESCE(ar.total_assignments, 0::bigint) AS total_assignments,\n    COALESCE(er.open_escalations, 0::bigint) AS open_escalations\n   FROM pod_roster pr\n     LEFT JOIN assignment_rollup ar ON ar.pod_id = pr.pod_id\n     LEFT JOIN escalation_rollup er ON er.pod_id = pr.pod_id\n  GROUP BY pr.pod_id, pr.pod_name, pr.cohort_id, ar.completed_assignments, ar.total_assignments, er.open_escalations;"
+        },
+        {
+          "name": "v_user_pods",
+          "owner": "postgres",
+          "schema": "public",
+          "comment": null,
+          "definition": " SELECT u.id AS user_id,\n    u.full_name,\n    u.email,\n    u.school_or_org,\n    u.role,\n    u.approval_status,\n    u.created_at,\n    pm.pod_id,\n    p.name AS pod_name,\n    p.cohort_id\n   FROM users u\n     LEFT JOIN pod_members pm ON pm.user_id = u.id\n     LEFT JOIN pods p ON p.id = pm.pod_id\n  WHERE u.deleted_at IS NULL;"
+        }
+      ],
+      "tables": [
+        {
+          "name": "assignment_submission_slots",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "assignment_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "order_index",
+              "type": "int4",
+              "default": "0",
+              "nullable": false,
+              "formatted_type": "integer",
+              "ordinal_position": 4
+            },
+            {
+              "name": "max_versions",
+              "type": "int4",
+              "default": "4",
+              "nullable": false,
+              "formatted_type": "integer",
+              "ordinal_position": 5
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "assignment_submission_slots_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX assignment_submission_slots_pkey ON public.assignment_submission_slots USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "assignment_submission_slots_assignment_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (assignment_id) REFERENCES assignments(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "assignments",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "assignment_submission_slots_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 11
+        },
+        {
+          "name": "assignments",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 2
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "instructions",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "week_number",
+              "type": "int4",
+              "nullable": true,
+              "formatted_type": "integer",
+              "ordinal_position": 5
+            },
+            {
+              "name": "start_date",
+              "type": "date",
+              "nullable": false,
+              "formatted_type": "date",
+              "ordinal_position": 6
+            },
+            {
+              "name": "end_date",
+              "type": "date",
+              "nullable": true,
+              "formatted_type": "date",
+              "ordinal_position": 7
+            },
+            {
+              "name": "is_active",
+              "type": "bool",
+              "default": "true",
+              "nullable": false,
+              "formatted_type": "boolean",
+              "ordinal_position": 8
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 9
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 10
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 11
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "assignments_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX assignments_pkey ON public.assignments USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "assignments_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "assignments_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "cohorts",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 2
+            },
+            {
+              "name": "start_date",
+              "type": "date",
+              "nullable": true,
+              "formatted_type": "date",
+              "ordinal_position": 3
+            },
+            {
+              "name": "end_date",
+              "type": "date",
+              "nullable": true,
+              "formatted_type": "date",
+              "ordinal_position": 4
+            },
+            {
+              "name": "status",
+              "type": "cohort_status",
+              "default": "'upcoming'::cohort_status",
+              "nullable": false,
+              "enum_values": [
+                "upcoming",
+                "active",
+                "completed"
+              ],
+              "formatted_type": "cohort_status",
+              "ordinal_position": 5
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "cohorts_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX cohorts_pkey ON public.cohorts USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "cohorts_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "conversation_participants",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "conversation_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "can_message",
+              "type": "bool",
+              "default": "true",
+              "nullable": false,
+              "formatted_type": "boolean",
+              "ordinal_position": 4
+            },
+            {
+              "name": "joined_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 5
+            },
+            {
+              "name": "last_read_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "left_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "added_by",
+              "type": "uuid",
+              "comment": "Who added this participant (mentor/associate/pm). Null = self-joined (e.g. staff oversight entry).",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "conversation_participants_conversation_id_user_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "conversation_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX conversation_participants_conversation_id_user_id_key ON public.conversation_participants USING btree (conversation_id, user_id)"
+            },
+            {
+              "name": "conversation_participants_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX conversation_participants_pkey ON public.conversation_participants USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [
+            {
+              "name": "conversation_participants_mark_notifications_read",
+              "events": [
+                "UPDATE"
+              ],
+              "timing": "AFTER",
+              "enabled": "ORIGIN",
+              "function": "mark_notifications_read_on_last_read_update",
+              "definition": "CREATE TRIGGER conversation_participants_mark_notifications_read AFTER UPDATE OF last_read_at ON public.conversation_participants FOR EACH ROW WHEN ((new.last_read_at IS DISTINCT FROM old.last_read_at)) EXECUTE FUNCTION mark_notifications_read_on_last_read_update()"
+            }
+          ],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "conversation_participants_added_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "added_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (added_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "conversation_participants_conversation_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "conversation_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (conversation_id) REFERENCES conversations(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "conversations",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "conversation_participants_conversation_id_user_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "conversation_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (conversation_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "conversation_participants_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "conversation_participants_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 17
+        },
+        {
+          "name": "conversations",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 2
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 4
+            },
+            {
+              "name": "last_message_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 5
+            },
+            {
+              "name": "kind",
+              "type": "conversation_kind",
+              "default": "'direct'::conversation_kind",
+              "nullable": false,
+              "enum_values": [
+                "direct",
+                "pod",
+                "broadcast",
+                "group"
+              ],
+              "formatted_type": "conversation_kind",
+              "ordinal_position": 6
+            },
+            {
+              "name": "pod_id",
+              "type": "uuid",
+              "comment": "Required when kind = pod. Null for direct, group, and broadcast conversations.",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 7
+            },
+            {
+              "name": "cohort_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 8
+            },
+            {
+              "name": "audience",
+              "type": "broadcast_audience",
+              "nullable": true,
+              "enum_values": [
+                "everyone",
+                "mentors",
+                "mentees"
+              ],
+              "formatted_type": "broadcast_audience",
+              "ordinal_position": 9
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 10
+            },
+            {
+              "name": "archived_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 11
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "conversations_broadcast_unique",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "cohort_id",
+                "audience"
+              ],
+              "partial": true,
+              "primary": false,
+              "predicate": "(kind = 'broadcast'::conversation_kind)",
+              "definition": "CREATE UNIQUE INDEX conversations_broadcast_unique ON public.conversations USING btree (cohort_id, audience) WHERE (kind = 'broadcast'::conversation_kind)"
+            },
+            {
+              "name": "conversations_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX conversations_pkey ON public.conversations USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "conversations_broadcast_kind_check",
+              "type": "CHECK",
+              "columns": [
+                "kind",
+                "cohort_id",
+                "audience"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "CHECK (kind <> 'broadcast'::conversation_kind OR cohort_id IS NOT NULL AND audience IS NOT NULL)",
+              "initially_deferred": false
+            },
+            {
+              "name": "conversations_cohort_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "cohort_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (cohort_id) REFERENCES cohorts(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "cohorts",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "conversations_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "conversations_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "conversations_pod_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "pod_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (pod_id) REFERENCES pods(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "pods",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "conversations_pod_kind_check",
+              "type": "CHECK",
+              "columns": [
+                "kind",
+                "pod_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "CHECK (kind <> 'pod'::conversation_kind OR pod_id IS NOT NULL)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 5
+        },
+        {
+          "name": "exit_survey_templates",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 2
+            },
+            {
+              "name": "role",
+              "type": "user_role",
+              "nullable": false,
+              "enum_values": [
+                "pm",
+                "associate",
+                "mentor",
+                "mentee"
+              ],
+              "formatted_type": "user_role",
+              "ordinal_position": 3
+            },
+            {
+              "name": "questions",
+              "type": "jsonb",
+              "default": "'[]'::jsonb",
+              "nullable": false,
+              "formatted_type": "jsonb",
+              "ordinal_position": 4
+            },
+            {
+              "name": "is_active",
+              "type": "bool",
+              "default": "true",
+              "nullable": false,
+              "formatted_type": "boolean",
+              "ordinal_position": 5
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "voice_prompt_label",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "exit_survey_templates_one_active_per_role",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "role"
+              ],
+              "partial": true,
+              "primary": false,
+              "predicate": "is_active",
+              "definition": "CREATE UNIQUE INDEX exit_survey_templates_one_active_per_role ON public.exit_survey_templates USING btree (role) WHERE is_active"
+            },
+            {
+              "name": "exit_survey_templates_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX exit_survey_templates_pkey ON public.exit_survey_templates USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "exit_survey_templates_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "exit_survey_templates_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "exit_surveys",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "meeting_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "user_role",
+              "type": "user_role",
+              "nullable": false,
+              "enum_values": [
+                "pm",
+                "associate",
+                "mentor",
+                "mentee"
+              ],
+              "formatted_type": "user_role",
+              "ordinal_position": 4
+            },
+            {
+              "name": "answers",
+              "type": "jsonb",
+              "nullable": true,
+              "formatted_type": "jsonb",
+              "ordinal_position": 5
+            },
+            {
+              "name": "signal",
+              "type": "exit_survey_signal",
+              "nullable": true,
+              "enum_values": [
+                "green",
+                "yellow",
+                "red"
+              ],
+              "formatted_type": "exit_survey_signal",
+              "ordinal_position": 6
+            },
+            {
+              "name": "transcript",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 7
+            },
+            {
+              "name": "ai_summary",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 8
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 9
+            },
+            {
+              "name": "concern_tags",
+              "type": "_text",
+              "default": "'{}'::text[]",
+              "nullable": false,
+              "formatted_type": "text[]",
+              "ordinal_position": 10
+            },
+            {
+              "name": "needs_follow_up",
+              "type": "bool",
+              "default": "false",
+              "nullable": false,
+              "formatted_type": "boolean",
+              "ordinal_position": 11
+            },
+            {
+              "name": "follow_up_urgency",
+              "type": "exit_survey_urgency",
+              "default": "'none'::exit_survey_urgency",
+              "nullable": false,
+              "enum_values": [
+                "none",
+                "soon",
+                "urgent"
+              ],
+              "formatted_type": "exit_survey_urgency",
+              "ordinal_position": 12
+            },
+            {
+              "name": "template_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 13
+            },
+            {
+              "name": "template_snapshot",
+              "type": "jsonb",
+              "default": "'[]'::jsonb",
+              "nullable": false,
+              "formatted_type": "jsonb",
+              "ordinal_position": 14
+            },
+            {
+              "name": "subject_user_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 15
+            },
+            {
+              "name": "submitted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 16
+            },
+            {
+              "name": "ai_headline",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 17
+            },
+            {
+              "name": "ai_key_points",
+              "type": "_text",
+              "default": "'{}'::text[]",
+              "nullable": false,
+              "formatted_type": "text[]",
+              "ordinal_position": 18
+            },
+            {
+              "name": "sentiment",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 19
+            },
+            {
+              "name": "voice_prompt_label",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 20
+            },
+            {
+              "name": "reviewed_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 21
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "exit_surveys_follow_up_urgency_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "follow_up_urgency"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX exit_surveys_follow_up_urgency_idx ON public.exit_surveys USING btree (follow_up_urgency)"
+            },
+            {
+              "name": "exit_surveys_meeting_id_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "meeting_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX exit_surveys_meeting_id_idx ON public.exit_surveys USING btree (meeting_id)"
+            },
+            {
+              "name": "exit_surveys_meeting_user_subject_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "meeting_id",
+                "user_id",
+                "subject_user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX exit_surveys_meeting_user_subject_key ON public.exit_surveys USING btree (meeting_id, user_id, subject_user_id)"
+            },
+            {
+              "name": "exit_surveys_needs_follow_up_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "needs_follow_up"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX exit_surveys_needs_follow_up_idx ON public.exit_surveys USING btree (needs_follow_up)"
+            },
+            {
+              "name": "exit_surveys_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX exit_surveys_pkey ON public.exit_surveys USING btree (id)"
+            },
+            {
+              "name": "exit_surveys_sentiment_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "sentiment"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX exit_surveys_sentiment_idx ON public.exit_surveys USING btree (sentiment)"
+            },
+            {
+              "name": "exit_surveys_signal_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "signal"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX exit_surveys_signal_idx ON public.exit_surveys USING btree (signal)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "exit_surveys_meeting_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "meeting_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (meeting_id) REFERENCES meetings(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "meetings",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "exit_surveys_meeting_user_subject_key",
+              "type": "UNIQUE",
+              "columns": [
+                "meeting_id",
+                "user_id",
+                "subject_user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (meeting_id, user_id, subject_user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "exit_surveys_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "exit_surveys_sentiment_check",
+              "type": "CHECK",
+              "columns": [
+                "sentiment"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "CHECK (sentiment = ANY (ARRAY['positive'::text, 'neutral'::text, 'negative'::text]))",
+              "initially_deferred": false
+            },
+            {
+              "name": "exit_surveys_subject_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "subject_user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (subject_user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "exit_surveys_template_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "template_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (template_id) REFERENCES exit_survey_templates(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "exit_survey_templates",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "exit_surveys_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "files",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 2
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "file_type",
+              "type": "link_type",
+              "default": "'file'::link_type",
+              "nullable": false,
+              "enum_values": [
+                "file",
+                "image",
+                "document",
+                "other"
+              ],
+              "formatted_type": "link_type",
+              "ordinal_position": 4
+            },
+            {
+              "name": "url",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "files_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX files_pkey ON public.files USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "files_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "files_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "meeting_participants",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "meeting_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "status",
+              "type": "meeting_participant_status",
+              "default": "'pending'::meeting_participant_status",
+              "nullable": false,
+              "enum_values": [
+                "pending",
+                "accepted",
+                "declined"
+              ],
+              "formatted_type": "meeting_participant_status",
+              "ordinal_position": 4
+            },
+            {
+              "name": "responded_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 5
+            },
+            {
+              "name": "invited_by",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 6
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "meeting_participants_meeting_id_user_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "meeting_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX meeting_participants_meeting_id_user_id_key ON public.meeting_participants USING btree (meeting_id, user_id)"
+            },
+            {
+              "name": "meeting_participants_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX meeting_participants_pkey ON public.meeting_participants USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "meeting_participants_invited_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "invited_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (invited_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "meeting_participants_meeting_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "meeting_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (meeting_id) REFERENCES meetings(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "meetings",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "meeting_participants_meeting_id_user_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "meeting_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (meeting_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "meeting_participants_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "meeting_participants_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 4
+        },
+        {
+          "name": "meeting_series",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "recurrence",
+              "type": "recurrence_type",
+              "nullable": false,
+              "enum_values": [
+                "none",
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "formatted_type": "recurrence_type",
+              "ordinal_position": 5
+            },
+            {
+              "name": "recurrence_until",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "meeting_series_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX meeting_series_pkey ON public.meeting_series USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "meeting_series_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "meeting_series_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "meetings",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "series_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "meet_link",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 6
+            },
+            {
+              "name": "starts_at",
+              "type": "timestamptz",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "ends_at",
+              "type": "timestamptz",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            },
+            {
+              "name": "status",
+              "type": "meeting_status",
+              "default": "'scheduled'::meeting_status",
+              "nullable": false,
+              "enum_values": [
+                "scheduled",
+                "completed",
+                "cancelled"
+              ],
+              "formatted_type": "meeting_status",
+              "ordinal_position": 9
+            },
+            {
+              "name": "notes",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 10
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 11
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 12
+            },
+            {
+              "name": "google_event_id",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 13
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "meetings_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX meetings_pkey ON public.meetings USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "meetings_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "meetings_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "meetings_series_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "series_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (series_id) REFERENCES meeting_series(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "meeting_series",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "mentee_assignments",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "mentee_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "assignment_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "assigned_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 4
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "due_at",
+              "type": "timestamptz",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "pushed_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "is_completed",
+              "type": "bool",
+              "default": "false",
+              "nullable": false,
+              "formatted_type": "boolean",
+              "ordinal_position": 8
+            },
+            {
+              "name": "notification_sent_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 12
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "mentee_assignments_mentee_assignment_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "mentee_id",
+                "assignment_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX mentee_assignments_mentee_assignment_key ON public.mentee_assignments USING btree (mentee_id, assignment_id)"
+            },
+            {
+              "name": "mentee_assignments_mentee_id_assignment_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "mentee_id",
+                "assignment_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX mentee_assignments_mentee_id_assignment_id_key ON public.mentee_assignments USING btree (mentee_id, assignment_id)"
+            },
+            {
+              "name": "mentee_assignments_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX mentee_assignments_pkey ON public.mentee_assignments USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "mentee_assignments_assigned_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "assigned_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (assigned_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_assignments_assignment_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (assignment_id) REFERENCES assignments(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "assignments",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_assignments_mentee_assignment_key",
+              "type": "UNIQUE",
+              "columns": [
+                "mentee_id",
+                "assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (mentee_id, assignment_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "mentee_assignments_mentee_id_assignment_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "mentee_id",
+                "assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (mentee_id, assignment_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "mentee_assignments_mentee_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "mentee_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (mentee_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_assignments_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "mentee_submissions",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "mentee_assignment_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "slot_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "file_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 4
+            },
+            {
+              "name": "version_number",
+              "type": "int4",
+              "default": "1",
+              "nullable": false,
+              "formatted_type": "integer",
+              "ordinal_position": 5
+            },
+            {
+              "name": "submitted_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "status",
+              "type": "submission_status",
+              "default": "'pending_review'::submission_status",
+              "nullable": false,
+              "enum_values": [
+                "pending_review",
+                "revision_requested",
+                "approved"
+              ],
+              "formatted_type": "submission_status",
+              "ordinal_position": 7
+            },
+            {
+              "name": "feedback",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 8
+            },
+            {
+              "name": "reviewed_by",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 9
+            },
+            {
+              "name": "reviewed_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 10
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "mentee_submissions_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX mentee_submissions_pkey ON public.mentee_submissions USING btree (id)"
+            },
+            {
+              "name": "mentee_submissions_slot_id_version_number_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "slot_id",
+                "version_number"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX mentee_submissions_slot_id_version_number_idx ON public.mentee_submissions USING btree (slot_id, version_number)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "mentee_submissions_file_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "file_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (file_id) REFERENCES files(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "files",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_submissions_mentee_assignment_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "mentee_assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (mentee_assignment_id) REFERENCES mentee_assignments(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "mentee_assignments",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_submissions_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "mentee_submissions_reviewed_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "reviewed_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (reviewed_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "mentee_submissions_slot_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "slot_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (slot_id) REFERENCES assignment_submission_slots(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "assignment_submission_slots",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "messages",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "conversation_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "sender_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "body",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 5
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "client_generated_id",
+              "type": "uuid",
+              "comment": "Client-generated id set at insert time. Used to reconcile optimistic UI (sending/sent/failed) and to dedupe retries. Not used server-side otherwise.",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 7
+            },
+            {
+              "name": "reply_to_message_id",
+              "type": "uuid",
+              "comment": "Points at the message this one is replying to. Replaces the old text-prefix hack.",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 8
+            },
+            {
+              "name": "forwarded_from_message_id",
+              "type": "uuid",
+              "comment": "Points at the original message when this row is a forward. Body is a fresh copy; this is provenance only.",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 9
+            },
+            {
+              "name": "deleted_by",
+              "type": "uuid",
+              "comment": "Who soft-deleted this message — the sender, or an associate/pm moderating.",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 10
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "messages_client_generated_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "client_generated_id"
+              ],
+              "partial": true,
+              "primary": false,
+              "predicate": "(client_generated_id IS NOT NULL)",
+              "definition": "CREATE UNIQUE INDEX messages_client_generated_id_key ON public.messages USING btree (client_generated_id) WHERE (client_generated_id IS NOT NULL)"
+            },
+            {
+              "name": "messages_conversation_id_created_at_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "conversation_id",
+                "created_at"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX messages_conversation_id_created_at_idx ON public.messages USING btree (conversation_id, created_at DESC)"
+            },
+            {
+              "name": "messages_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id)"
+            },
+            {
+              "name": "messages_reply_to_message_id_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "reply_to_message_id"
+              ],
+              "partial": true,
+              "primary": false,
+              "predicate": "(reply_to_message_id IS NOT NULL)",
+              "definition": "CREATE INDEX messages_reply_to_message_id_idx ON public.messages USING btree (reply_to_message_id) WHERE (reply_to_message_id IS NOT NULL)"
+            }
+          ],
+          "policies": [
+            {
+              "name": "messages_insert_participant",
+              "roles": [
+                "public"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "with_check_expression": "((sender_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM conversation_participants cp\n  WHERE ((cp.conversation_id = messages.conversation_id) AND (cp.user_id = auth.uid()) AND (cp.left_at IS NULL) AND (cp.can_message = true)))))"
+            },
+            {
+              "name": "messages_select_participant",
+              "roles": [
+                "public"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "using_expression": "((EXISTS ( SELECT 1\n   FROM conversation_participants cp\n  WHERE ((cp.conversation_id = messages.conversation_id) AND (cp.user_id = auth.uid()) AND (cp.left_at IS NULL)))) OR is_staff(auth.uid()))"
+            },
+            {
+              "name": "messages_update_delete",
+              "roles": [
+                "public"
+              ],
+              "command": "UPDATE",
+              "permissive": "PERMISSIVE",
+              "using_expression": "((sender_id = auth.uid()) OR is_staff(auth.uid()))",
+              "with_check_expression": "((sender_id = auth.uid()) OR is_staff(auth.uid()))"
+            }
+          ],
+          "triggers": [
+            {
+              "name": "messages_touch_conversation",
+              "events": [
+                "INSERT"
+              ],
+              "timing": "AFTER",
+              "enabled": "ORIGIN",
+              "function": "touch_conversation_last_message_at",
+              "definition": "CREATE TRIGGER messages_touch_conversation AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION touch_conversation_last_message_at()"
+            }
+          ],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "messages_conversation_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "conversation_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (conversation_id) REFERENCES conversations(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "conversations",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "messages_deleted_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "deleted_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (deleted_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "messages_forwarded_from_message_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "forwarded_from_message_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (forwarded_from_message_id) REFERENCES messages(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "messages",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "messages_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "messages_reply_to_message_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "reply_to_message_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (reply_to_message_id) REFERENCES messages(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "messages",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "messages_sender_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "sender_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (sender_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": true,
+          "estimated_row_count": 32
+        },
+        {
+          "name": "notifications",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "type",
+              "type": "notification_type",
+              "nullable": false,
+              "enum_values": [
+                "meeting_invite",
+                "meeting_started",
+                "assignment_due",
+                "assignment_submitted",
+                "assignment_reviewed",
+                "exit_survey_pending",
+                "message",
+                "reminder",
+                "achievement"
+              ],
+              "formatted_type": "notification_type",
+              "ordinal_position": 3
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "body",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "mentee_assignment_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 6
+            },
+            {
+              "name": "exit_survey_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 7
+            },
+            {
+              "name": "message_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 8
+            },
+            {
+              "name": "meeting_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 9
+            },
+            {
+              "name": "scheduled_for",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 10
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 11
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 12
+            },
+            {
+              "name": "resource_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 13
+            },
+            {
+              "name": "action_items",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 14
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "notifications_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+            },
+            {
+              "name": "notifications_type_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "type"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX notifications_type_idx ON public.notifications USING btree (type)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "notifications_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "notifications_exit_survey_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "exit_survey_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (exit_survey_id) REFERENCES exit_surveys(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "exit_surveys",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "notifications_meeting_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "meeting_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (meeting_id) REFERENCES meetings(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "meetings",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "notifications_mentee_assignment_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "mentee_assignment_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (mentee_assignment_id) REFERENCES mentee_assignments(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "mentee_assignments",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "notifications_message_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "message_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (message_id) REFERENCES messages(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "messages",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "notifications_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "notifications_resource_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "resource_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (resource_id) REFERENCES resources_and_courses(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "resources_and_courses",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 70
+        },
+        {
+          "name": "pod_members",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "pod_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "pod_members_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX pod_members_pkey ON public.pod_members USING btree (id)"
+            },
+            {
+              "name": "pod_members_pod_id_user_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "pod_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX pod_members_pod_id_user_id_key ON public.pod_members USING btree (pod_id, user_id)"
+            },
+            {
+              "name": "pod_members_pod_user_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "pod_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX pod_members_pod_user_key ON public.pod_members USING btree (pod_id, user_id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [
+            {
+              "name": "trg_pod_member_conversation",
+              "events": [
+                "INSERT"
+              ],
+              "timing": "AFTER",
+              "enabled": "ORIGIN",
+              "function": "ensure_pod_and_broadcast_membership",
+              "definition": "CREATE TRIGGER trg_pod_member_conversation AFTER INSERT ON public.pod_members FOR EACH ROW EXECUTE FUNCTION ensure_pod_and_broadcast_membership()"
+            }
+          ],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "pod_members_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "pod_members_pod_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "pod_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (pod_id) REFERENCES pods(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "pods",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "pod_members_pod_id_user_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "pod_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (pod_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "pod_members_pod_user_key",
+              "type": "UNIQUE",
+              "columns": [
+                "pod_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (pod_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "pod_members_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "pods",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "cohort_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "skill_level",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "pods_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX pods_pkey ON public.pods USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "pods_cohort_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "cohort_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (cohort_id) REFERENCES cohorts(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "cohorts",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "pods_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "push_subscriptions",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "endpoint",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "p256dh",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "auth",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 5
+            },
+            {
+              "name": "user_agent",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "push_subscriptions_endpoint_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "endpoint"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX push_subscriptions_endpoint_key ON public.push_subscriptions USING btree (endpoint)"
+            },
+            {
+              "name": "push_subscriptions_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX push_subscriptions_pkey ON public.push_subscriptions USING btree (id)"
+            },
+            {
+              "name": "push_subscriptions_user_id_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "user_id"
+              ],
+              "partial": true,
+              "primary": false,
+              "predicate": "(deleted_at IS NULL)",
+              "definition": "CREATE INDEX push_subscriptions_user_id_idx ON public.push_subscriptions USING btree (user_id) WHERE (deleted_at IS NULL)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "push_subscriptions_endpoint_key",
+              "type": "UNIQUE",
+              "columns": [
+                "endpoint"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (endpoint)",
+              "initially_deferred": false
+            },
+            {
+              "name": "push_subscriptions_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "push_subscriptions_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+              "delete_rule": "CASCADE",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "resource_files",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "resource_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "file_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "resource_files_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX resource_files_pkey ON public.resource_files USING btree (id)"
+            },
+            {
+              "name": "resource_files_resource_file_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "resource_id",
+                "file_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX resource_files_resource_file_key ON public.resource_files USING btree (resource_id, file_id)"
+            },
+            {
+              "name": "resource_files_resource_id_file_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "resource_id",
+                "file_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX resource_files_resource_id_file_id_key ON public.resource_files USING btree (resource_id, file_id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "resource_files_file_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "file_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (file_id) REFERENCES files(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "files",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "resource_files_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "resource_files_resource_file_key",
+              "type": "UNIQUE",
+              "columns": [
+                "resource_id",
+                "file_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (resource_id, file_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "resource_files_resource_id_file_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "resource_id",
+                "file_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (resource_id, file_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "resource_files_resource_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "resource_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (resource_id) REFERENCES resources_and_courses(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "resources_and_courses",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "resource_updates",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "resource_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "mentee_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "progress_note",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "progress_percent",
+              "type": "int4",
+              "nullable": true,
+              "formatted_type": "integer",
+              "ordinal_position": 5
+            },
+            {
+              "name": "hours_spent",
+              "type": "numeric",
+              "nullable": true,
+              "formatted_type": "numeric",
+              "ordinal_position": 6
+            },
+            {
+              "name": "file_id",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 7
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 9
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "resource_updates_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX resource_updates_pkey ON public.resource_updates USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "resource_updates_file_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "file_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (file_id) REFERENCES files(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "files",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "resource_updates_mentee_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "mentee_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (mentee_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "resource_updates_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "resource_updates_resource_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "resource_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (resource_id) REFERENCES resources_and_courses(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "resources_and_courses",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "resources_and_courses",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "type",
+              "type": "resource_course_type",
+              "nullable": true,
+              "enum_values": [
+                "handbook",
+                "toolkit",
+                "template",
+                "video",
+                "guide",
+                "external_course"
+              ],
+              "formatted_type": "resource_course_type",
+              "ordinal_position": 2
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "nullable": false,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "links",
+              "type": "_text",
+              "nullable": true,
+              "formatted_type": "text[]",
+              "ordinal_position": 5
+            },
+            {
+              "name": "status",
+              "type": "resource_status",
+              "default": "'ongoing'::resource_status",
+              "nullable": false,
+              "enum_values": [
+                "ongoing",
+                "paused",
+                "completed",
+                "abandoned"
+              ],
+              "formatted_type": "resource_status",
+              "ordinal_position": 6
+            },
+            {
+              "name": "week_number",
+              "type": "int4",
+              "nullable": true,
+              "formatted_type": "integer",
+              "ordinal_position": 7
+            },
+            {
+              "name": "created_by",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 8
+            },
+            {
+              "name": "assigned_to",
+              "type": "uuid",
+              "nullable": true,
+              "formatted_type": "uuid",
+              "ordinal_position": 9
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 10
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 11
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "resources_and_courses_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX resources_and_courses_pkey ON public.resources_and_courses USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "resources_and_courses_assigned_to_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "assigned_to"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (assigned_to) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "resources_and_courses_created_by_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "created_by"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (created_by) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "resources_and_courses_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        },
+        {
+          "name": "user_notifications",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "default": "gen_random_uuid()",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "notification_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 2
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 3
+            },
+            {
+              "name": "status",
+              "type": "notification_delivery_status",
+              "default": "'sent'::notification_delivery_status",
+              "nullable": false,
+              "enum_values": [
+                "pending",
+                "sent",
+                "failed"
+              ],
+              "formatted_type": "notification_delivery_status",
+              "ordinal_position": 4
+            },
+            {
+              "name": "sent_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 5
+            },
+            {
+              "name": "read_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 6
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 7
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "user_notifications_notification_id_user_id_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "notification_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX user_notifications_notification_id_user_id_key ON public.user_notifications USING btree (notification_id, user_id)"
+            },
+            {
+              "name": "user_notifications_notification_user_key",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "notification_id",
+                "user_id"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE UNIQUE INDEX user_notifications_notification_user_key ON public.user_notifications USING btree (notification_id, user_id)"
+            },
+            {
+              "name": "user_notifications_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX user_notifications_pkey ON public.user_notifications USING btree (id)"
+            },
+            {
+              "name": "user_notifications_user_id_read_at_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "user_id",
+                "read_at"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX user_notifications_user_id_read_at_idx ON public.user_notifications USING btree (user_id, read_at)"
+            },
+            {
+              "name": "user_notifications_user_id_status_idx",
+              "method": "btree",
+              "unique": false,
+              "columns": [
+                "user_id",
+                "status"
+              ],
+              "partial": false,
+              "primary": false,
+              "definition": "CREATE INDEX user_notifications_user_id_status_idx ON public.user_notifications USING btree (user_id, status)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "user_notifications_notification_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "notification_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (notification_id) REFERENCES notifications(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "notifications",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "user_notifications_notification_id_user_id_key",
+              "type": "UNIQUE",
+              "columns": [
+                "notification_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (notification_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "user_notifications_notification_user_key",
+              "type": "UNIQUE",
+              "columns": [
+                "notification_id",
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "UNIQUE (notification_id, user_id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "user_notifications_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            },
+            {
+              "name": "user_notifications_user_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "user_id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+              "delete_rule": "NO ACTION",
+              "update_rule": "NO ACTION",
+              "referenced_table": "users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": 142
+        },
+        {
+          "name": "users",
+          "owner": "postgres",
+          "schema": "public",
+          "columns": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "nullable": false,
+              "formatted_type": "uuid",
+              "ordinal_position": 1
+            },
+            {
+              "name": "role",
+              "type": "user_role",
+              "nullable": false,
+              "enum_values": [
+                "pm",
+                "associate",
+                "mentor",
+                "mentee"
+              ],
+              "formatted_type": "user_role",
+              "ordinal_position": 2
+            },
+            {
+              "name": "bio",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 3
+            },
+            {
+              "name": "background_notes",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 4
+            },
+            {
+              "name": "goals",
+              "type": "_text",
+              "nullable": true,
+              "formatted_type": "text[]",
+              "ordinal_position": 5
+            },
+            {
+              "name": "interests",
+              "type": "_text",
+              "nullable": true,
+              "formatted_type": "text[]",
+              "ordinal_position": 6
+            },
+            {
+              "name": "school_or_org",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 7
+            },
+            {
+              "name": "created_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 8
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamptz",
+              "default": "now()",
+              "nullable": false,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 9
+            },
+            {
+              "name": "deleted_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "formatted_type": "timestamp with time zone",
+              "ordinal_position": 10
+            },
+            {
+              "name": "approval_status",
+              "type": "approval_status",
+              "default": "'pending'::approval_status",
+              "nullable": false,
+              "enum_values": [
+                "pending",
+                "approved",
+                "rejected"
+              ],
+              "formatted_type": "approval_status",
+              "ordinal_position": 11
+            },
+            {
+              "name": "full_name",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 12
+            },
+            {
+              "name": "email",
+              "type": "text",
+              "nullable": true,
+              "formatted_type": "text",
+              "ordinal_position": 13
+            }
+          ],
+          "comment": null,
+          "indexes": [
+            {
+              "name": "users_pkey",
+              "method": "btree",
+              "unique": true,
+              "columns": [
+                "id"
+              ],
+              "partial": false,
+              "primary": true,
+              "definition": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"
+            }
+          ],
+          "policies": [],
+          "triggers": [],
+          "rls_forced": false,
+          "constraints": [
+            {
+              "name": "users_id_fkey",
+              "type": "FOREIGN KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE",
+              "delete_rule": "CASCADE",
+              "update_rule": "NO ACTION",
+              "referenced_table": "auth.users",
+              "initially_deferred": false,
+              "referenced_columns": [
+                "id"
+              ]
+            },
+            {
+              "name": "users_pkey",
+              "type": "PRIMARY KEY",
+              "columns": [
+                "id"
+              ],
+              "validated": true,
+              "deferrable": false,
+              "definition": "PRIMARY KEY (id)",
+              "initially_deferred": false
+            }
+          ],
+          "rls_enabled": false,
+          "estimated_row_count": -1
+        }
+      ],
+      "storage": [
+        {
+          "id": "id",
+          "name": "buckets"
+        }
+      ],
+      "database": {
+        "name": "postgres",
+        "user": "postgres",
+        "schema": "public",
+        "version": "PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit"
+      },
+      "cron_jobs": [
+        {
+          "schema": "cron",
+          "relation": "job",
+          "job_table_exists": true
+        }
+      ],
+      "functions": [
+        {
+          "name": "ensure_cohort_broadcasts",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "p_cohort_id uuid, p_created_by uuid",
+          "definition": "\r\ndeclare\r\n  v_cohort_name text;\r\n  v_audience broadcast_audience;\r\n  v_conversation_id uuid;\r\nbegin\r\n  select name into v_cohort_name from cohorts where id = p_cohort_id;\r\n \r\n  foreach v_audience in array array['everyone','mentors','mentees']::broadcast_audience[]\r\n  loop\r\n    select id into v_conversation_id from conversations\r\n      where cohort_id = p_cohort_id and kind = 'broadcast' and audience = v_audience;\r\n \r\n    if v_conversation_id is null then\r\n      insert into conversations (kind, cohort_id, audience, created_by, name)\r\n      values ('broadcast', p_cohort_id, v_audience, p_created_by,\r\n              v_cohort_name || ' — ' || initcap(v_audience::text))\r\n      returning id into v_conversation_id;\r\n \r\n      -- backfill every current PM/associate as a full sender on the new channel\r\n      insert into conversation_participants (conversation_id, user_id, can_message)\r\n      select v_conversation_id, u.id, true\r\n      from users u where u.role in ('pm', 'associate');\r\n    end if;\r\n  end loop;\r\nend;\r\n",
+          "return_type": "void",
+          "security_definer": true
+        },
+        {
+          "name": "ensure_pod_and_broadcast_membership",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "",
+          "definition": "\r\ndeclare\r\n  v_pod_conversation_id uuid;\r\n  v_cohort_id uuid;\r\n  v_user_role user_role;\r\nbegin\r\n  select cohort_id into v_cohort_id from pods where id = new.pod_id;\r\n  select role into v_user_role from users where id = new.user_id;\r\n \r\n  -- Pod conversation: create if needed, join always\r\n  select id into v_pod_conversation_id from conversations\r\n    where pod_id = new.pod_id and kind = 'pod';\r\n  if v_pod_conversation_id is null then\r\n    insert into conversations (kind, pod_id, cohort_id, created_by, name)\r\n    select 'pod', p.id, p.cohort_id, new.user_id, p.name from pods p where p.id = new.pod_id\r\n    returning id into v_pod_conversation_id;\r\n  end if;\r\n  insert into conversation_participants (conversation_id, user_id, can_message)\r\n  values (v_pod_conversation_id, new.user_id, true)\r\n  on conflict (conversation_id, user_id) do update set left_at = null;\r\n \r\n  -- Cohort broadcasts: ensure they exist, then join the ones this role receives\r\n  perform ensure_cohort_broadcasts(v_cohort_id, new.user_id);\r\n \r\n  insert into conversation_participants (conversation_id, user_id, can_message)\r\n  select c.id, new.user_id,\r\n    (c.audience = 'mentors' and v_user_role = 'mentor')  -- only reply-capable case\r\n  from conversations c\r\n  where c.kind = 'broadcast' and c.cohort_id = v_cohort_id\r\n    and (\r\n      c.audience = 'everyone'\r\n      or (c.audience = 'mentors' and v_user_role = 'mentor')\r\n      or (c.audience = 'mentees' and v_user_role = 'mentee')\r\n    )\r\n  on conflict (conversation_id, user_id) do update set left_at = null;\r\n \r\n  return new;\r\nend;\r\n",
+          "return_type": "trigger",
+          "security_definer": true
+        },
+        {
+          "name": "enter_conversation_and_send",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "p_conversation_id uuid, p_body text DEFAULT NULL::text, p_client_generated_id uuid DEFAULT NULL::uuid",
+          "definition": "\r\nDECLARE\r\n  v_user_id uuid := auth.uid();\r\n  v_message public.messages;\r\nBEGIN\r\n  IF v_user_id IS NULL THEN\r\n    RAISE EXCEPTION 'Not authenticated';\r\n  END IF;\r\n\r\n  IF NOT public.is_staff(v_user_id) THEN\r\n    RAISE EXCEPTION 'Only associate/program_manager roles may enter conversations via this path';\r\n  END IF;\r\n\r\n  -- Insert or reactivate participant row.\r\n  INSERT INTO public.conversation_participants (conversation_id, user_id, can_message, left_at)\r\n  VALUES (p_conversation_id, v_user_id, true, NULL)\r\n  ON CONFLICT (conversation_id, user_id)\r\n  DO UPDATE SET can_message = true, left_at = NULL;\r\n\r\n  -- If no body was provided, this was a plain \"Enter\" click — return early.\r\n  IF p_body IS NULL OR btrim(p_body) = '' THEN\r\n    RETURN NULL;\r\n  END IF;\r\n\r\n  INSERT INTO public.messages (conversation_id, sender_id, body, client_generated_id)\r\n  VALUES (p_conversation_id, v_user_id, p_body, p_client_generated_id)\r\n  RETURNING * INTO v_message;\r\n\r\n  RETURN v_message;\r\nEND;\r\n",
+          "return_type": "messages",
+          "security_definer": true
+        },
+        {
+          "name": "is_staff",
+          "schema": "public",
+          "language": "sql",
+          "arguments": "check_user_id uuid",
+          "definition": "\r\n  SELECT EXISTS (\r\n    SELECT 1\r\n    FROM public.users u\r\n    WHERE u.id = check_user_id\r\n      AND u.role IN ('associate', 'pm')\r\n  );\r\n",
+          "return_type": "boolean",
+          "security_definer": true
+        },
+        {
+          "name": "mark_notifications_read_on_last_read_update",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "",
+          "definition": "\r\nBEGIN\r\n  IF NEW.last_read_at IS NULL THEN\r\n    RETURN NEW;\r\n  END IF;\r\n  IF OLD.last_read_at IS NOT NULL AND NEW.last_read_at <= OLD.last_read_at THEN\r\n    RETURN NEW;\r\n  END IF;\r\n\r\n  UPDATE public.user_notifications un\r\n  SET read_at = now()\r\n  FROM public.notifications n\r\n  JOIN public.messages m ON m.id = n.message_id\r\n  WHERE un.notification_id = n.id\r\n    AND un.user_id = NEW.user_id\r\n    AND m.conversation_id = NEW.conversation_id\r\n    AND m.created_at <= NEW.last_read_at\r\n    AND un.read_at IS NULL;\r\n\r\n  RETURN NEW;\r\nEND;\r\n",
+          "return_type": "trigger",
+          "security_definer": true
+        },
+        {
+          "name": "search_conversation_messages",
+          "schema": "public",
+          "language": "sql",
+          "arguments": "p_conversation_id uuid, p_query text",
+          "definition": "\r\n  SELECT m.*\r\n  FROM public.messages m\r\n  WHERE m.conversation_id = p_conversation_id\r\n    AND m.deleted_at IS NULL\r\n    AND m.body ILIKE '%' || p_query || '%'\r\n    AND (\r\n      EXISTS (\r\n        SELECT 1 FROM public.conversation_participants cp\r\n        WHERE cp.conversation_id = m.conversation_id\r\n          AND cp.user_id = auth.uid()\r\n          AND cp.left_at IS NULL\r\n      )\r\n      OR public.is_staff(auth.uid())\r\n    )\r\n  ORDER BY m.created_at DESC\r\n  LIMIT 100;\r\n",
+          "return_type": "SETOF messages",
+          "security_definer": true
+        },
+        {
+          "name": "sync_user_email",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "",
+          "definition": "\r\nbegin\r\n  update public.users\r\n  set email = new.email\r\n  where id = new.id;\r\n  return new;\r\nend;\r\n",
+          "return_type": "trigger",
+          "security_definer": true
+        },
+        {
+          "name": "touch_conversation_last_message_at",
+          "schema": "public",
+          "language": "plpgsql",
+          "arguments": "",
+          "definition": "\r\nBEGIN\r\n  UPDATE public.conversations\r\n  SET last_message_at = NEW.created_at\r\n  WHERE id = NEW.conversation_id;\r\n  RETURN NEW;\r\nEND;\r\n",
+          "return_type": "trigger",
+          "security_definer": true
+        }
+      ],
+      "sequences": [],
+      "extensions": [
+        {
+          "name": "pg_cron",
+          "schema": "pg_catalog",
+          "version": "1.6.4"
+        },
+        {
+          "name": "pg_net",
+          "schema": "public",
+          "version": "0.20.3"
+        },
+        {
+          "name": "pg_stat_statements",
+          "schema": "extensions",
+          "version": "1.11"
+        },
+        {
+          "name": "pgcrypto",
+          "schema": "extensions",
+          "version": "1.3"
+        },
+        {
+          "name": "plpgsql",
+          "schema": "pg_catalog",
+          "version": "1.0"
+        },
+        {
+          "name": "supabase_vault",
+          "schema": "vault",
+          "version": "0.3.1"
+        },
+        {
+          "name": "uuid-ossp",
+          "schema": "extensions",
+          "version": "1.1"
+        }
+      ],
+      "vault_secrets": []
+    }
+  }
+]

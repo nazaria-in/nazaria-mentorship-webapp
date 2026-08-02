@@ -1,3 +1,4 @@
+// components/shell/ConditionalShell.tsx
 "use client";
 
 import * as React from "react";
@@ -18,10 +19,8 @@ export function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { permissionLevel } = useRole();
 
-  // Strip trailing slash except for root itself
-  const normalizedPathname = pathname && pathname !== "/" && pathname.endsWith("/") 
-    ? pathname.slice(0, -1) 
-    : pathname;
+  const normalizedPathname =
+    pathname && pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 
   const isIndexPage = normalizedPathname === "/";
   const skipShell = isIndexPage || NO_SHELL_PREFIXES.some((p) => normalizedPathname?.startsWith(p));
