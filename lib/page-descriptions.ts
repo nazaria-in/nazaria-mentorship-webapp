@@ -17,18 +17,17 @@ type DescriptionEntry = string | RoleDescriptions;
 
 export const PAGE_DESCRIPTIONS: Record<string, DescriptionEntry> = {
   dashboard: {
-    mentee: "Your overview — quick links to what needs your attention.",
+    mentee: "Here you can see all your pending assignments, pending exit surveys, and any upcoming meetings.",
     mentor: "Your mentees at a glance, plus anything waiting on you.",
     default: "Program overview and analytics.", // pm/associate
   },
-  meetings: "This is where you Create/Join meeting times — afterward, fill the exit survey.",
+  meetings: "This is where you Create/Join meetings — after the meeting you will havet to fill the exit survey.",
   assignments: {
     mentee: "Browse and submit your assignments and courses here.",
     mentor: "Dispatch, track, and review your pod's assignments and courses.",
     default: "Browse and review assignments and courses across the program.",
   },
-  resources: "Course materials and reference resources for your program.",
-  chat: "Message your pod, mentors, or staff.",
+  chat: "",
   notifications: "All your notifications in one place.",
   profile: "Manage your profile details.",
   admin: "Program administration and oversight tools.",

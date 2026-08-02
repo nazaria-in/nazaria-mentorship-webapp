@@ -9,14 +9,18 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import { fetchAssignedAssignmentsForUser } from "@/lib/api/mentee-assignments";
 import { fetchMeetingsInRange } from "@/lib/api/meetings";
-import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TimelineElement } from "@/components/shared/TimelineElement";
 import { PendingExitSurveysWidget } from "@/components/exit-survey/PendingExitSurveysWidget";
 import { useState, useMemo } from "react";
 import { TimelineElementDetailsModal } from "@/components/shared/TimelineElementDetailsModal";
-import type { Assignment } from "@/types/assignments";
 import type { MeetingWithParticipants } from "@/types/meetings";
+
+
+//depreciated
+// import { AssignmentCard } from "@/components/assignments/AssignmentCard";
+// import type { Assignment } from "@/types/assignments";
+
 
 interface SelectedMeetingItem {
   kind: "meeting";
@@ -59,12 +63,15 @@ export default function DashboardPage() {
     };
   }, []);
 
+
+  /* Deperciated
   // Fetch active assignments safely with typed dataset
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
   queryKey: ["assignments", "dashboard", "assigned-to-me", userId, role],
   queryFn: () => fetchAssignedAssignmentsForUser({ role, userId }),
   enabled: !!userId,
   });
+  */
 
   // Fetch upcoming meetings using the existing range function setup
   const { data: meetings, isLoading: meetingsLoading } = useQuery<MeetingWithParticipants[]>({
@@ -123,8 +130,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Active Horizons Tracker Column */}
+          {/*
           <div className="space-y-3">
             <h2 className="font-heading text-sm font-semibold text-text-primary dark:text-text-primary">
               Active Horizons & Deadlines
@@ -158,9 +164,10 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          */}
         </section>
 
-        {/* Traditional Project Grid Section */}
+        {/* 
         <section>
           <h2 className="mb-3 font-heading text-sm font-semibold text-text-primary dark:text-text-primary">
             Assignments
@@ -178,6 +185,7 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+        */}
 
         {permissionLevel === "staff" && (
           <section className="rounded-2xl border border-dashed border-border dark:border-border p-4">
