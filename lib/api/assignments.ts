@@ -1,5 +1,7 @@
 // /lib/api/assignments.ts
+//Deperated File
 
+/*
 import { createClient } from "@/lib/supabase/client";
 import type { Assignment, AssignmentSubmissionSlot, AssignmentWithSlots } from "@/types/assignments";
 import { UserRole } from "@/types/users";
@@ -186,3 +188,4 @@ export async function fetchAssignmentsForRole(
   // pm / associate: everything
   return fetchAssignments();
 }
+*/

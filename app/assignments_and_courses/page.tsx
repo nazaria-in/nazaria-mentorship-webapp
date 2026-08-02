@@ -1,4 +1,4 @@
-// /app/assignments-and-courses/page.tsx
+// /app/assignments_and_courses/page.tsx
 
 "use client";
 
@@ -239,7 +239,7 @@ function MenteeView({
             ) : (
               <CardGrid>
                 {toDo.map((d) => (
-                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments-and-courses/via/${d.id}`} />
+                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments_and_courses/via/${d.id}`} />
                 ))}
               </CardGrid>
             )}
@@ -250,7 +250,7 @@ function MenteeView({
               <SectionLabel label="Completed" count={completed.length} />
               <CardGrid>
                 {completed.map((d) => (
-                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments-and-courses/via/${d.id}`} />
+                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments_and_courses/via/${d.id}`} />
                 ))}
               </CardGrid>
             </div>
@@ -348,7 +348,7 @@ function StaffView({
                     <ContentItemCard
                       key={item.id}
                       item={item}
-                      href={`/assignments-and-courses/${item.id}`}
+                      href={`/assignments_and_courses/${item.id}`}
                       onEdit={() => onEdit(item.id)}
                       onDelete={() => onDelete(item.id)}
                     />
@@ -365,7 +365,7 @@ function StaffView({
                   <ContentItemCard
                     key={item.id}
                     item={item}
-                    href={`/assignments-and-courses/${item.id}`}
+                    href={`/assignments_and_courses/${item.id}`}
                     onEdit={() => onEdit(item.id)}
                     onDelete={() => onDelete(item.id)}
                   />

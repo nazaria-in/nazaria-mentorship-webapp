@@ -1,5 +1,7 @@
 // /lib/api/mentee-assignments.ts
+// Deprecated File
 
+/*
 import { createClient } from "@/lib/supabase/client";
 import { fetchPodMemberGroups } from "@/lib/api/pods";
 import { scheduleAssignmentReminders } from "@/lib/notifications/assignment-notifications";
@@ -173,7 +175,7 @@ interface SubmittedVersionRow extends MenteeSubmission {
  * display name, and assignment title are all resolved here via the same
  * single-query-join pattern reviewSubmission below uses, rather than
  * pushing that lookup onto the caller.
- */
+ /
 export async function submitVersion(input: {
   mentee_assignment_id: string;
   slot_id: string;
@@ -297,9 +299,9 @@ export async function dispatchAssignment(input: {
   description?: string | null;
   /** Needed for the reminder cascade notification copy — pass the value
    *  already loaded on the caller's side (e.g. AssignmentFormModal's
-   *  rosterTarget) rather than re-fetching it here. */
+   *  rosterTarget) rather than re-fetching it here. 
   assignmentTitle: string;
-  /** Same reasoning as assignmentTitle — used as the reminder cascade anchor. */
+  /** Same reasoning as assignmentTitle — used as the reminder cascade anchor.
   assignmentStartDate: string;
 }): Promise<MenteeAssignment[]> {
   const supabase = createClient();
@@ -394,7 +396,7 @@ export interface FetchMenteeAssignmentsForTimelineParams {
  * - mentor: rows for mentees in the mentor's own pod(s).
  * - pm/associate: every row (staff oversight).
  * Scoped to [rangeStart, rangeEnd) on due_at to match Timeline's range.
- */
+ 
 export async function fetchMenteeAssignmentsForTimeline(
   params: FetchMenteeAssignmentsForTimelineParams,
 ): Promise<MenteeAssignmentTimelineRow[]> {
@@ -469,7 +471,7 @@ function dedupeByAssignmentId(rows: MenteeAssignmentWithAssignmentRow[]): Assign
  * - mentee: only their own dispatched assignments (empty if not logged in).
  * - mentor: assignments dispatched to mentees in the mentor's own pod(s).
  * - pm/associate: every dispatched assignment (staff oversight).
- */
+ 
 export async function fetchAssignedAssignmentsForUser(
   params: FetchAssignedAssignmentsForUserParams,
 ): Promise<Assignment[]> {
@@ -505,3 +507,4 @@ export async function fetchAssignedAssignmentsForUser(
   if (error) throw error;
   return dedupeByAssignmentId((data ?? []) as unknown as MenteeAssignmentWithAssignmentRow[]);
 }
+*/

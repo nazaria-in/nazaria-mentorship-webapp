@@ -134,7 +134,7 @@ export async function fetchMenteeContentDispatches(menteeId: string, contentType
 
 /**
  * Single-dispatch fetch for the mentee submission page
- * (/assignments-and-courses/via/[dispatchId]). Reuses the same status
+ * (/assignments_and_courses/via/[dispatchId]). Reuses the same status
  * derivation as fetchMenteeContentDispatches rather than duplicating it —
  * fetches the one row via content_dispatches, then layers on
  * v_mentee_assignment_status only for assignments, same as the list path.

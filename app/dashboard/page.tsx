@@ -7,7 +7,6 @@ import Link from "next/link";
 import { NAV_BY_PERMISSION } from "@/components/shell/NavConfig";
 import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
-import { fetchAssignedAssignmentsForUser } from "@/lib/api/mentee-assignments";
 import { fetchMeetingsInRange } from "@/lib/api/meetings";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TimelineElement } from "@/components/shared/TimelineElement";
@@ -20,6 +19,8 @@ import type { MeetingWithParticipants } from "@/types/meetings";
 //depreciated
 // import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 // import type { Assignment } from "@/types/assignments";
+// import { fetchAssignedAssignmentsForUser } from "@/lib/api/mentee-assignments";
+
 
 
 interface SelectedMeetingItem {

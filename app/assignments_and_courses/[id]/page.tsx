@@ -1,4 +1,4 @@
-// /app/assignments-and-courses/[id]/page.tsx
+// /app/assignments_and_courses/[id]/page.tsx
 
 "use client";
 
@@ -83,7 +83,7 @@ export default function ContentItemDetailPage() {
     <div className="flex flex-col gap-4 p-4">
       <button
         type="button"
-        onClick={() => router.push("/assignments-and-courses")}
+        onClick={() => router.push("/assignments_and_courses")}
         className="flex w-fit items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary dark:text-text-muted dark:hover:text-text-primary"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
