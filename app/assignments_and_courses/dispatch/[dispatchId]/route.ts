@@ -1,6 +1,6 @@
 // /app/assignments_and_courses/dispatch/[dispatchId]/route.ts
 
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -21,21 +21,22 @@ import { createClient } from "@/lib/supabase/server";
  * (per the file tree listing it exists, but its actual contents weren't
  * shared) — confirm the import shape matches before relying on this.
  */
-export async function GET(_request: Request, { params }: { params: { dispatchId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ dispatchId: string }> }
+) {
+  const { dispatchId } = await params;
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("content_dispatches")
     .select("content_item_id")
-    .eq("id", params.dispatchId)
+    .eq("id", dispatchId)
     .maybeSingle();
 
   const origin = new URL(_request.url).origin;
 
   if (error || !data) {
-    // Dispatch was removed or the id is stale (e.g. an old notification
-    // pointing at something since deleted) — fall back to the list page
-    // rather than a broken 404.
     return NextResponse.redirect(new URL("/assignments_and_courses", origin));
   }
 

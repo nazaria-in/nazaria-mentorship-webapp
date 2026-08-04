@@ -160,9 +160,11 @@ export function AppShell({
           {globalSearch && <div className="hidden flex-1 justify-center sm:flex">{globalSearch}</div>}
 
           <div className="flex items-center gap-2">
+            {/*
             <div className="hidden sm:block">
               <RoleSwitcher />
             </div>
+            */}
             {headerExtra}
             <Link
               href="/chat"
@@ -279,10 +281,11 @@ export function AppShell({
         </div>
       )}
 
-      {/* Mobile-only role switcher */}
+      {/* Mobile-only role switcher 
       <div className="fixed bottom-20 right-3 z-20 sm:hidden">
         <RoleSwitcher />
       </div>
+      */}
     </div>
   );
 }
