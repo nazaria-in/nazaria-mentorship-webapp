@@ -3,7 +3,7 @@
 "use client";
 
 import * as React from "react";
-import { TimelineElement } from "@/components/shared/TimelineElement";
+import { TimelineElement, type TimelineElementSizeHint } from "@/components/shared/TimelineElement";
 import { TimelineElementDetailsModal } from "@/components/shared/TimelineElementDetailsModal";
 import type { TimelineEvent, TimelineEventType, TimelineViewMode } from "@/types/timeline";
 
@@ -13,15 +13,40 @@ export interface TimelineProps {
   /** Called whenever the visible date range changes (view switch or navigation) so the parent can refetch. Pass a stable (useCallback) function. */
   onRangeChange: (rangeStartIso: string, rangeEndIso: string) => void;
   onSelectEmptySlot?: (startsAtIso: string) => void;
-  /** Which event types can appear in this mount — only these get a filter chip. Defaults to both. */
+  /** Which event types can appear in this mount — only these get a filter chip. Defaults to all five. */
   availableTypes?: TimelineEventType[];
 }
+
+const ALL_EVENT_TYPES: TimelineEventType[] = [
+  "meeting",
+  "in_person_session",
+  "assignment",
+  "course",
+  "resource",
+];
+
+const TYPE_CHIP_LABELS: Record<TimelineEventType, string> = {
+  meeting: "Meetings",
+  in_person_session: "In-person",
+  assignment: "Assignments",
+  course: "Courses",
+  resource: "Resources",
+};
 
 // 1. EXTENDED HOURS: Covers a standard full day from 12 AM to 11:59 PM (24 hours total)
 const HOUR_START = 0;
 const HOUR_END = 24;
 const HOUR_HEIGHT_PX = 56;
 const FOCUS_HOUR = 9; // The hour we want to scroll to initially
+const HEADER_HEIGHT_PX = 52; // fixed so the all-day row below can stick at a known offset
+const ALL_DAY_CHIP_HEIGHT_PX = 44;
+
+// Duration thresholds (minutes) that decide how much a card can render.
+// Tuned against HOUR_HEIGHT_PX = 56px/hour: a 15-min slot is ~14px tall,
+// too little for any text — icon only. A 30-min slot (~28px) fits an icon
+// + single truncated title line but not a time line under it too.
+const SIZE_HINT_XS_MAX_MINUTES = 15;
+const SIZE_HINT_SM_MAX_MINUTES = 30;
 
 type ChipState = "neutral" | "include" | "exclude";
 
@@ -48,7 +73,16 @@ function nextChipState(state: ChipState): ChipState {
   return "neutral";
 }
 
-function timeLabelFor(event: TimelineEvent): string {
+function buildInitialTypeFilters(types: TimelineEventType[]): Record<TimelineEventType, ChipState> {
+  const result = {} as Record<TimelineEventType, ChipState>;
+  for (const type of types) {
+    result[type] = "neutral";
+  }
+  return result;
+}
+
+/** Full context label (weekday, date, time) — used in the details modal, where repeating the date is useful, not redundant. */
+function fullTimeLabelFor(event: TimelineEvent): string {
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
   const dateLabel = start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
@@ -58,19 +92,44 @@ function timeLabelFor(event: TimelineEvent): string {
   return `${dateLabel} · ${start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} – ${end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
+/** Time-only label for in-grid cards — the day/week grid already conveys which day this is, so weekday/date would just repeat what's visible from position. */
+function timeOnlyLabelFor(event: TimelineEvent): string {
+  const start = new Date(event.startsAt);
+  const end = new Date(event.endsAt);
+  if (event.startsAt === event.endsAt) {
+    return start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  return `${start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} – ${end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
+/** Deadline nodes (assignments/courses/resources) show the due date itself, not a time — rendered in red by TimelineElement via isDeadlineNode. */
+function dueDateLabelFor(event: TimelineEvent): string {
+  const due = new Date(event.endsAt);
+  return `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+function sizeHintFor(event: TimelineEvent): TimelineElementSizeHint {
+  if (event.isDeadlineNode) return "sm"; // due-date chips: icon + title, "Due" tag, no time line needed
+  const start = new Date(event.startsAt);
+  const end = new Date(event.endsAt);
+  const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+  if (durationMinutes <= SIZE_HINT_XS_MAX_MINUTES) return "xs";
+  if (durationMinutes <= SIZE_HINT_SM_MAX_MINUTES) return "sm";
+  return "md";
+}
+
 export function Timeline({
   events,
   isLoading = false,
   onRangeChange,
   onSelectEmptySlot,
-  availableTypes = ["meeting", "assignment"],
+  availableTypes = ALL_EVENT_TYPES,
 }: TimelineProps): React.JSX.Element {
   const [viewMode, setViewMode] = React.useState<TimelineViewMode>("week");
   const [anchorDate, setAnchorDate] = React.useState(() => new Date());
-  const [typeFilters, setTypeFilters] = React.useState<Record<TimelineEventType, ChipState>>({
-    meeting: "neutral",
-    assignment: "neutral",
-  });
+  const [typeFilters, setTypeFilters] = React.useState<Record<TimelineEventType, ChipState>>(() =>
+    buildInitialTypeFilters(availableTypes),
+  );
   const [selectedEvent, setSelectedEvent] = React.useState<TimelineEvent | null>(null);
 
   const range = React.useMemo(() => {
@@ -93,7 +152,7 @@ export function Timeline({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.start.getTime(), range.end.getTime()]);
 
-const includedTypes = React.useMemo(
+  const includedTypes = React.useMemo(
     () => Object.entries(typeFilters).filter(([, s]) => s === "include").map(([t]) => t as TimelineEventType),
     [typeFilters],
   );
@@ -158,7 +217,7 @@ const includedTypes = React.useMemo(
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-border p-0.5">
             {(["month", "week", "day"] as const).map((mode) => (
               <button
@@ -175,13 +234,13 @@ const includedTypes = React.useMemo(
           </div>
 
           {availableTypes.length > 1 && (
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {availableTypes.map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setTypeFilters((prev) => ({ ...prev, [type]: nextChipState(prev[type]) }))}
-                  className={`rounded-full border px-2.5 py-1 text-xs capitalize ${
+                  className={`rounded-full border px-2.5 py-1 text-xs ${
                     typeFilters[type] === "include"
                       ? "border-primary bg-primary text-primary-foreground"
                       : typeFilters[type] === "exclude"
@@ -189,7 +248,7 @@ const includedTypes = React.useMemo(
                         : "border-border text-text-primary hover:bg-card-alt"
                   }`}
                 >
-                  {type}s
+                  {TYPE_CHIP_LABELS[type]}
                 </button>
               ))}
             </div>
@@ -216,7 +275,7 @@ const includedTypes = React.useMemo(
           isOpen={Boolean(selectedEvent)}
           onClose={() => setSelectedEvent(null)}
           title={selectedEvent.title}
-          timeLabel={timeLabelFor(selectedEvent)}
+          timeLabel={fullTimeLabelFor(selectedEvent)}
           actions={selectedEvent.renderActions?.()}
         >
           {selectedEvent.renderDetails()}
@@ -237,7 +296,7 @@ interface HourGridProps {
 function HourGrid({ rangeStart, numDays, events, onSelectEvent, onSelectEmptySlot }: HourGridProps): React.JSX.Element {
   const days = React.useMemo(() => Array.from({ length: numDays }, (_, i) => addDays(rangeStart, i)), [rangeStart, numDays]);
   const hours = React.useMemo(() => Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i), []);
-  
+
   // 2. SCROLL LOGIC: Reference to scrollable timeline viewport container
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -272,19 +331,59 @@ function HourGrid({ rangeStart, numDays, events, onSelectEvent, onSelectEmptySlo
 
   return (
     /* 3. WRAPPER CONTAINER: Fixed height with custom scrolling layout added */
-    <div 
+    <div
       ref={scrollContainerRef}
-      className="grid overflow-auto max-h-[600px] scroll-smooth" 
+      className="grid overflow-auto max-h-[600px] scroll-smooth"
       style={{ gridTemplateColumns: `3.5rem repeat(${numDays}, minmax(8rem, 1fr))` }}
     >
       {/* Sticky Day Headers */}
-      <div className="sticky top-0 z-10 bg-card" />
+      <div className="sticky top-0 z-20 bg-card" style={{ height: HEADER_HEIGHT_PX }} />
       {days.map((day) => (
-        <div key={day.toISOString()} className="sticky top-0 z-10 bg-card border-b border-border pb-2 text-center">
+        <div
+          key={day.toISOString()}
+          className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-b border-border bg-card"
+          style={{ height: HEADER_HEIGHT_PX }}
+        >
           <p className="text-xs font-medium uppercase text-text-muted">{day.toLocaleDateString(undefined, { weekday: "short" })}</p>
           <p className="text-sm font-semibold text-text-primary">{day.getDate()}</p>
         </div>
       ))}
+
+      {/* Sticky all-day / due-date row — assignments, courses, and
+          resources have no time-of-day, only a due date, so they don't
+          belong inside the hourly grid below. Pinned under the headers,
+          same pattern as a calendar's "all day" strip, so it stays visible
+          while scrolling through the hours. */}
+      <div
+        className="sticky z-10 border-b border-border bg-card"
+        style={{ top: HEADER_HEIGHT_PX }}
+      />
+      {days.map((day) => {
+        const allDayEvents = (eventsByDay.get(day.toDateString()) ?? []).filter((e) => e.isDeadlineNode);
+        return (
+          <div
+            key={`${day.toISOString()}-allday`}
+            className="sticky z-10 flex flex-col gap-1 border-b border-l border-border bg-card p-1"
+            style={{ top: HEADER_HEIGHT_PX }}
+          >
+            {allDayEvents.map((event) => (
+              <div key={event.id} style={{ height: ALL_DAY_CHIP_HEIGHT_PX }}>
+                <TimelineElement
+                  title={event.title}
+                  type={event.type}
+                  layout="hourGrid"
+                  timeLabel={dueDateLabelFor(event)}
+                  statusLabel={event.statusLabel}
+                  isMuted={event.isMuted}
+                  isDeadlineNode
+                  onShowDetails={() => onSelectEvent(event)}
+                  sizeHint="md"
+                />
+              </div>
+            ))}
+          </div>
+        );
+      })}
 
       {/* Hour Column Labels */}
       <div className="relative flex flex-col">
@@ -316,30 +415,32 @@ function HourGrid({ rangeStart, numDays, events, onSelectEvent, onSelectEmptySlo
             />
           ))}
 
-          {(eventsByDay.get(day.toDateString()) ?? []).map((event) => {
-            const { top, height } = positionFor(event);
-            return (
-              <div key={event.id} className="absolute inset-x-1" style={{ top, height }}>
-                <TimelineElement
-                  title={event.title}
-                  timeLabel={timeLabelFor(event)}
-                  statusLabel={event.statusLabel}
-                  isMuted={event.isMuted}
-                  onShowDetails={() => onSelectEvent(event)}
-                  variant={event.type}
-                  durationVariant={event.durationVariant}
-                  isDeadlineNode={event.isDeadlineNode}
-                />
-              </div>
-            );
-          })}
+          {(eventsByDay.get(day.toDateString()) ?? [])
+            .filter((event) => !event.isDeadlineNode)
+            .map((event) => {
+              const { top, height } = positionFor(event);
+              return (
+                <div key={event.id} className="absolute inset-x-1" style={{ top, height }}>
+                  <TimelineElement
+                    title={event.title}
+                    type={event.type}
+                    layout="hourGrid"
+                    timeLabel={timeOnlyLabelFor(event)}
+                    statusLabel={event.statusLabel}
+                    isMuted={event.isMuted}
+                    isDeadlineNode={event.isDeadlineNode}
+                    onShowDetails={() => onSelectEvent(event)}
+                    sizeHint={sizeHintFor(event)}
+                  />
+                </div>
+              );
+            })}
         </div>
       ))}
     </div>
   );
 }
 
-// ... MonthGrid unchanged
 interface MonthGridProps {
   monthStart: Date;
   events: TimelineEvent[];
@@ -348,6 +449,7 @@ interface MonthGridProps {
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_GRID_CELLS = 42; // 6 weeks — always enough to cover any month
+const MONTH_CELL_VISIBLE_EVENTS = 3;
 
 function MonthGrid({ monthStart, events, onSelectEvent }: MonthGridProps): React.JSX.Element {
   const gridStart = startOfWeek(monthStart);
@@ -377,7 +479,7 @@ function MonthGrid({ monthStart, events, onSelectEvent }: MonthGridProps): React
       {days.map((day) => {
         const isCurrentMonth = day.getMonth() === monthStart.getMonth();
         const dayEvents = eventsByDay.get(day.toDateString()) ?? [];
-        const visible = dayEvents.slice(0, 3);
+        const visible = dayEvents.slice(0, MONTH_CELL_VISIBLE_EVENTS);
         const overflow = dayEvents.length - visible.length;
 
         return (
@@ -392,12 +494,12 @@ function MonthGrid({ monthStart, events, onSelectEvent }: MonthGridProps): React
               <TimelineElement
                 key={event.id}
                 title={event.title}
-                timeLabel={timeLabelFor(event)}
-                statusLabel={event.statusLabel}
+                type={event.type}
+                layout="month"
+                timeLabel={event.isDeadlineNode ? dueDateLabelFor(event) : undefined}
+                isDeadlineNode={event.isDeadlineNode}
                 isMuted={event.isMuted}
                 onShowDetails={() => onSelectEvent(event)}
-                compact={false}
-                variant="month-summary"
               />
             ))}
             {overflow > 0 && <p className="text-[11px] text-text-muted">+{overflow} more</p>}

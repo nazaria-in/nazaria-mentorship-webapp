@@ -31,7 +31,6 @@ export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
 
   staff: [
     { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-    { id: "admin", label: "Admin", href: "/admin", icon: LayoutDashboard },
     { id: "assignments_and_courses", label: "Assignments and Courses", href: "/assignments_and_courses", icon: ClipboardCheck },
     { id: "meetings", label: "Meetings", href: "/meetings", icon: CalendarDays },
     { id: "exit-surveys", label: "Exit Surveys", href: "/exit-survey", icon: ListChecks },

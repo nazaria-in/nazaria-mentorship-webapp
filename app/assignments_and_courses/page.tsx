@@ -239,7 +239,7 @@ function MenteeView({
             ) : (
               <CardGrid>
                 {toDo.map((d) => (
-                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments_and_courses/via/${d.id}`} />
+                  <MenteeContentCard key={d.content_item.id} dispatch={d} href={`/assignments_and_courses/${d.content_item.id}`} />
                 ))}
               </CardGrid>
             )}
@@ -250,7 +250,7 @@ function MenteeView({
               <SectionLabel label="Completed" count={completed.length} />
               <CardGrid>
                 {completed.map((d) => (
-                  <MenteeContentCard key={d.id} dispatch={d} href={`/assignments_and_courses/via/${d.id}`} />
+                  <MenteeContentCard key={d.content_item.id} dispatch={d} href={`/assignments_and_courses/${d.content_item.id}`} />
                 ))}
               </CardGrid>
             </div>

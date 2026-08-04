@@ -3,115 +3,153 @@
 "use client";
 
 import * as React from "react";
+import { BookOpen, ClipboardList, FileBox, MapPin, Video, type LucideIcon } from "lucide-react";
+import type { TimelineEventType } from "@/types/timeline";
+
+/**
+ * How much room the card actually has, decided by the caller (Timeline.tsx)
+ * from real pixel height / event duration — not measured here. Keeps this
+ * component a pure function of its props instead of doing its own
+ * ResizeObserver plumbing.
+ *   xs — icon only (e.g. a 10-15 min meeting slot)
+ *   sm — icon + title, single line, no time text
+ *   md — icon + title + time, room to breathe
+ */
+export type TimelineElementSizeHint = "xs" | "sm" | "md";
 
 export interface TimelineElementProps {
   title: string;
-  timeLabel: string;
+  type: TimelineEventType;
+  /** Layout context. "month" never renders time text — the day cell already
+   * carries the date, so repeating it per-card is redundant. "hourGrid" is
+   * the week/day view where a short time range is useful context. */
+  layout: "hourGrid" | "month";
+  /** Time range only — no weekday/date. Omit for "month" layout entirely. */
+  timeLabel?: string;
   statusLabel?: string;
   isMuted?: boolean;
-  onShowDetails: () => void;
-  /** compact = absolutely-positioned inside an hour-grid slot. non-compact = a stacked chip or row bar. */
-  compact?: boolean;
-  /** Architecture variant supporting the structural segregation of data types */
-  variant?: "meeting" | "assignment" | "month-summary";
-  /** Structural duration layouts to optimize vertical space (e.g., 'short' <= 30m, 'standard' >= 60m) */
-  durationVariant?: "short" | "standard";
-  /** Multi-day assignment attributes for horizontal grid placement */
-  assignmentSpanDays?: number;
   isDeadlineNode?: boolean;
-  children?: React.ReactNode;
+  onShowDetails: () => void;
+  /** Only meaningful for layout="hourGrid" — see TimelineElementSizeHint. */
+  sizeHint?: TimelineElementSizeHint;
 }
+
+interface TypeStyle {
+  icon: LucideIcon;
+  colorVar: string; // CSS custom property name, e.g. "--chart-2"
+  label: string;
+}
+
+const TYPE_STYLES: Record<TimelineEventType, TypeStyle> = {
+  meeting: { icon: Video, colorVar: "--chart-2", label: "Meeting" },
+  in_person_session: { icon: MapPin, colorVar: "--chart-4", label: "In-person" },
+  assignment: { icon: ClipboardList, colorVar: "--chart-1", label: "Assignment" },
+  course: { icon: BookOpen, colorVar: "--chart-3", label: "Course" },
+  resource: { icon: FileBox, colorVar: "--chart-5", label: "Resource" },
+};
 
 export function TimelineElement({
   title,
+  type,
+  layout,
   timeLabel,
   statusLabel,
   isMuted = false,
-  onShowDetails,
-  compact = true,
-  variant = "meeting",
-  durationVariant = "standard",
-  assignmentSpanDays = 1,
   isDeadlineNode = false,
-  children,
+  onShowDetails,
+  sizeHint = "md",
 }: TimelineElementProps): React.JSX.Element {
-  
-  // Base Layout Engine Class Assignment
-  let variantClasses = "";
-  
-  if (variant === "assignment") {
-    // Structural multi-day horizon style layout
-    variantClasses = "h-8 items-center flex-row justify-between px-3 py-1 rounded-md border border-dashed text-ellipsis";
-  } else if (variant === "month-summary") {
-    // Executive summary architecture for month day cells
-    variantClasses = "w-full justify-between items-center flex-row px-2 py-0.5 text-left border-b last:border-0";
-  } else {
-    // Standard and short meeting layouts inside the timeline track
-    variantClasses = compact 
-      ? `h-full p-1.5 ${durationVariant === "short" ? "flex-row items-center gap-2 justify-between" : "flex-col items-start gap-0.5"}` 
-      : "px-2 py-1 flex-col items-start gap-0.5";
+  const style = TYPE_STYLES[type];
+  const Icon = style.icon;
+  const colorValue = `var(${style.colorVar})`;
+
+  if (layout === "month") {
+    return (
+      <button
+        type="button"
+        onClick={onShowDetails}
+        title={title}
+        aria-label={`${style.label}: ${title}`}
+        className={`flex w-full items-center gap-1 rounded-md border-l-2 px-1.5 py-0.5 text-left text-[11px] leading-tight transition-opacity hover:opacity-80 ${
+          isMuted ? "opacity-50" : ""
+        }`}
+        style={{
+          borderLeftColor: colorValue,
+          backgroundColor: `color-mix(in srgb, ${colorValue} 12%, transparent)`,
+        }}
+      >
+        <Icon className="h-3 w-3 shrink-0" style={{ color: colorValue }} aria-hidden="true" />
+        <span className={`truncate text-text-primary ${isMuted ? "line-through" : ""}`}>{title}</span>
+        {isDeadlineNode && timeLabel && (
+          <span className="ml-auto shrink-0 truncate text-[10px] font-semibold text-destructive">{timeLabel}</span>
+        )}
+      </button>
+    );
+  }
+
+  // layout === "hourGrid"
+  const iconSizePx = sizeHint === "xs" ? 12 : sizeHint === "sm" ? 13 : 14;
+
+  if (sizeHint === "xs") {
+    // Too little vertical room for any text — icon only, full details on
+    // click, title available as a native tooltip on hover/focus.
+    return (
+      <button
+        type="button"
+        onClick={onShowDetails}
+        title={`${title}${timeLabel ? ` · ${timeLabel}` : ""}`}
+        aria-label={`${style.label}: ${title}`}
+        className={`flex h-full w-full items-center justify-center rounded-md border transition-opacity hover:opacity-80 ${
+          isMuted ? "opacity-50" : ""
+        }`}
+        style={{
+          borderColor: `color-mix(in srgb, ${colorValue} 40%, transparent)`,
+          backgroundColor: `color-mix(in srgb, ${colorValue} 14%, transparent)`,
+        }}
+      >
+        <Icon style={{ color: colorValue, width: iconSizePx, height: iconSizePx }} aria-hidden="true" />
+      </button>
+    );
   }
 
   return (
     <button
       type="button"
       onClick={onShowDetails}
-      style={
-        variant === "assignment" && assignmentSpanDays > 1 
-          ? { gridColumnEnd: `span ${assignmentSpanDays}` } 
-          : undefined
-      }
-      className={`surface-card-strong flex w-full overflow-hidden text-left transition hover:border-border-strong ${variantClasses} ${
-        isMuted ? "opacity-50 line-through" : ""
+      title={title}
+      aria-label={`${style.label}: ${title}`}
+      className={`flex h-full w-full flex-col items-start gap-0.5 overflow-hidden rounded-md border px-1.5 py-1 text-left transition-opacity hover:opacity-80 ${
+        isMuted ? "opacity-50" : ""
       }`}
+      style={{
+        borderColor: `color-mix(in srgb, ${colorValue} 40%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${colorValue} 14%, transparent)`,
+      }}
     >
-      {/* Structural Data Rendering Split Logic */}
-      {variant === "assignment" ? (
-        <>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-xs font-bold shrink-0">[✏️]</span>
-            <p className="truncate text-xs font-semibold text-text-primary">{title}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 ml-2">
-            <p className="text-[11px] text-text-muted hidden sm:block">{timeLabel}</p>
-            {isDeadlineNode && (
-              <span className="text-[10px] font-bold bg-error text-error-foreground px-1.5 py-0.2 rounded animate-pulse">
-                🎯 Due
-              </span>
-            )}
-          </div>
-        </>
-      ) : variant === "month-summary" ? (
-        <>
-          <p className="truncate text-xs text-text-primary font-medium">{title}</p>
-          <p className="text-[10px] text-text-muted shrink-0 ml-1.5">{timeLabel}</p>
-        </>
-      ) : (
-        /* Standard Timeline Meeting Layout */
-        <>
-          {durationVariant === "short" ? (
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-              <p className="truncate text-xs font-semibold text-text-primary">{title}</p>
-              <p className="truncate text-[11px] text-text-muted">({timeLabel})</p>
-            </div>
-          ) : (
-            <>
-              <p className="w-full truncate text-xs font-semibold text-text-primary">{title}</p>
-              <p className="w-full truncate text-[11px] text-text-muted">{timeLabel}</p>
-            </>
-          )}
+      <span className="flex w-full items-center gap-1">
+        <Icon
+          className="shrink-0"
+          style={{ color: colorValue, width: iconSizePx, height: iconSizePx }}
+          aria-hidden="true"
+        />
+        <span
+          className={`truncate text-xs font-medium text-text-primary ${isMuted ? "line-through" : ""}`}
+        >
+          {title}
+        </span>
+      </span>
 
-          {/* Render status metrics conditionally based on length space boundaries */}
-          {statusLabel && durationVariant !== "short" && (
-            <span className="inline-block rounded-full bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground mt-0.5">
-              {statusLabel}
-            </span>
-          )}
-        </>
+      {isDeadlineNode && timeLabel && (
+        <span className="truncate text-[10px] font-semibold text-destructive">{timeLabel}</span>
       )}
-      
-      {children}
+
+      {!isDeadlineNode && sizeHint === "md" && timeLabel && (
+        <span className="truncate text-[10px] text-text-muted">{timeLabel}</span>
+      )}
+
+      {sizeHint === "md" && statusLabel && (
+        <span className="truncate text-[10px] text-text-muted">{statusLabel}</span>
+      )}
     </button>
   );
 }

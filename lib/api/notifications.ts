@@ -27,6 +27,11 @@ function resolveClient(clientOrPayload: unknown): { client: NotificationsClient;
  * notifications). Practically: everything created here goes out on the
  * next cron tick, whether it was scheduled for the future or "now".
  * Returns the new notification's id.
+ *
+ * CHANGED: `mentee_assignment_id`/`resource_id` → `content_dispatch_id`/
+ * `content_submission_id`, matching the real `notifications` table columns
+ * you confirmed. This was a live bug independent of the content rework —
+ * the previous insert wrote to columns that don't exist on the real table.
  */
 export async function createNotification(input: CreateNotificationInput): Promise<string>;
 export async function createNotification(supabase: NotificationsClient, input: CreateNotificationInput): Promise<string>;
@@ -51,10 +56,10 @@ export async function createNotification(
       title: input.title,
       body: input.body ?? null,
       meeting_id: input.meetingId ?? null,
-      mentee_assignment_id: input.menteeAssignmentId ?? null,
+      content_dispatch_id: input.contentDispatchId ?? null,
+      content_submission_id: input.contentSubmissionId ?? null,
       exit_survey_id: input.exitSurveyId ?? null,
       message_id: input.messageId ?? null,
-      resource_id: input.resourceId ?? null,
       scheduled_for: scheduledFor.toISOString(),
     })
     .select("id")
@@ -83,17 +88,18 @@ export async function createNotification(
 
 export interface CancelPendingFilter {
   meetingId?: string;
-  menteeAssignmentId?: string;
+  /** REPLACES the old `menteeAssignmentId`. */
+  contentDispatchId?: string;
   /** Restrict cancellation to one recipient (e.g. a single declined participant). */
   userId?: string;
 }
 
 /**
  * Soft-cancels not-yet-sent notifications matching the filter — used on
- * meeting decline/reschedule/cancel and on early assignment completion.
- * Only touches rows still `pending`; anything already `sent` is left alone
- * (a user who already got the reminder shouldn't have it silently vanish
- * from their notification list).
+ * meeting decline/reschedule/cancel and on content-dispatch Mark Complete.
+ * Only touches rows still `pending`; anything already `sent` is left
+ * alone (a user who already got the reminder shouldn't have it silently
+ * vanish from their notification list).
  */
 export async function cancelPendingNotifications(filter: CancelPendingFilter): Promise<void>;
 export async function cancelPendingNotifications(supabase: NotificationsClient, filter: CancelPendingFilter): Promise<void>;
@@ -104,14 +110,14 @@ export async function cancelPendingNotifications(
   const { client, isClientPassed } = resolveClient(clientOrFilter);
   const filter = isClientPassed ? maybeFilter! : (clientOrFilter as CancelPendingFilter);
 
-  if (!filter.meetingId && !filter.menteeAssignmentId) {
-    throw new Error("cancelPendingNotifications requires meetingId or menteeAssignmentId.");
+  if (!filter.meetingId && !filter.contentDispatchId) {
+    throw new Error("cancelPendingNotifications requires meetingId or contentDispatchId.");
   }
 
   let notificationQuery = client.from("notifications").select("id");
   if (filter.meetingId) notificationQuery = notificationQuery.eq("meeting_id", filter.meetingId);
-  if (filter.menteeAssignmentId) {
-    notificationQuery = notificationQuery.eq("mentee_assignment_id", filter.menteeAssignmentId);
+  if (filter.contentDispatchId) {
+    notificationQuery = notificationQuery.eq("content_dispatch_id", filter.contentDispatchId);
   }
 
   const { data: matchingNotifications, error: matchError } = await notificationQuery;
@@ -153,9 +159,7 @@ export async function markNotificationRead(
 /**
  * Marks every currently-unread, non-deleted notification for a user as
  * read. `scopedNotificationIds`, when passed, restricts this to whatever
- * filter is active on the caller's list (e.g. "mark all read" clicked
- * while the sidebar is filtered to "Meetings only") — omit it to mark
- * everything read.
+ * filter is active on the caller's list — omit it to mark everything read.
  */
 export async function markAllNotificationsRead(userId: string, scopedNotificationIds?: string[]): Promise<void>;
 export async function markAllNotificationsRead(supabase: NotificationsClient, userId: string, scopedNotificationIds?: string[]): Promise<void>;

@@ -11,9 +11,12 @@ import { fetchMeetingsInRange } from "@/lib/api/meetings";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TimelineElement } from "@/components/shared/TimelineElement";
 import { PendingExitSurveysWidget } from "@/components/exit-survey/PendingExitSurveysWidget";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { TimelineElementDetailsModal } from "@/components/shared/TimelineElementDetailsModal";
 import type { MeetingWithParticipants } from "@/types/meetings";
+import { UpcomingContentWidget } from "@/components/content/UpcomingContentWidget";
+import { AdminDashboardContent } from "../admin/page";
+import ContentAnalyticsPage from "../admin/content-analytics/page";
 
 
 //depreciated
@@ -64,16 +67,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-
-  /* Deperciated
-  // Fetch active assignments safely with typed dataset
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
-  queryKey: ["assignments", "dashboard", "assigned-to-me", userId, role],
-  queryFn: () => fetchAssignedAssignmentsForUser({ role, userId }),
-  enabled: !!userId,
-  });
-  */
-
   // Fetch upcoming meetings using the existing range function setup
   const { data: meetings, isLoading: meetingsLoading } = useQuery<MeetingWithParticipants[]>({
     queryKey: ["meetings", "dashboard", userId, role, rangeStart, rangeEnd],
@@ -81,8 +74,16 @@ export default function DashboardPage() {
     enabled: !!userId,
   });
 
+  const isPmOrAssociate = role === "pm" || role === "associate";
+
   return (
     <>
+      {isPmOrAssociate && (
+        <Suspense fallback={<p className="p-6 text-text-muted">Loading…</p>}>
+          <AdminDashboardContent />
+          <ContentAnalyticsPage />
+        </Suspense>
+      )}
       <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">
         {showOwnPendingSurveys && <PendingExitSurveysWidget userId={userId} />}
 
@@ -113,10 +114,11 @@ export default function DashboardPage() {
                   return (
                     <TimelineElement
                       key={meeting.id}
-                      variant="meeting"
+                      type="meeting" // Change variant to type
+                      layout="hourGrid" // Add required layout prop
                       title={meeting.title}
                       timeLabel={`${timeString} (${durationMinutes} mins)`}
-                      durationVariant={durationMinutes <= 30 ? "short" : "standard"}
+                      // Removed durationVariant (not valid prop)
                       onShowDetails={() =>
                         setSelectedItem({
                           kind: "meeting",
@@ -131,62 +133,8 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          {/*
-          <div className="space-y-3">
-            <h2 className="font-heading text-sm font-semibold text-text-primary dark:text-text-primary">
-              Active Horizons & Deadlines
-            </h2>
-
-            {assignmentsLoading ? (
-              <div className="text-sm text-text-primary/50 dark:text-text-primary/50">Loading horizons...</div>
-            ) : !assignments || assignments.length === 0 ? (
-              <div className="border border-dashed border-border dark:border-border p-4 rounded-xl text-center text-xs text-text-muted dark:text-text-muted">
-                No long-term tasks assigned.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {assignments.slice(0, 4).map((assignment) => (
-                  <TimelineElement
-                    key={assignment.id}
-                    variant="assignment"
-                    title={assignment.title}
-                    timeLabel="Due This Week"
-                    isDeadlineNode={true}
-                    onShowDetails={() =>
-                      setSelectedItem({
-                        kind: "assignment",
-                        title: assignment.title,
-                        description: assignment.description || "Project assignment dashboard viewport tracker card.",
-                        assignmentId: assignment.id,
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          */}
         </section>
-
-        {/* 
-        <section>
-          <h2 className="mb-3 font-heading text-sm font-semibold text-text-primary dark:text-text-primary">
-            Assignments
-          </h2>
-
-          {assignmentsLoading ? (
-            <div className="text-sm text-text-primary/50 dark:text-text-primary/50">Loading boards…</div>
-          ) : !assignments || assignments.length === 0 ? (
-            <EmptyState title="No active assignments" description="Check back once one is created." />
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {assignments.map((a) => (
-                <AssignmentCard key={a.id} assignment={a} href={`/assignments/${a.id}`} />
-              ))}
-            </div>
-          )}
-        </section>
-        */}
+        {userId && <UpcomingContentWidget menteeId={userId} />}
 
         {permissionLevel === "staff" && (
           <section className="rounded-2xl border border-dashed border-border dark:border-border p-4">

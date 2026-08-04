@@ -82,7 +82,7 @@ function usePendingApprovalsCount() {
   });
 }
 
-function AdminDashboardContent() {
+export function AdminDashboardContent() {
   const searchParams = useSearchParams();
   const scopedId = searchParams.get("id");
 

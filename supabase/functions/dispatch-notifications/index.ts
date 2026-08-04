@@ -6,7 +6,7 @@
 // and whose parent notification's scheduled_for has passed, sends a Chrome
 // push to each of that user's subscriptions, and marks the row `sent`.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js@2";
 import webpush from "npm:web-push@3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") as string;

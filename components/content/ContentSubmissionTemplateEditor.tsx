@@ -18,6 +18,15 @@ import {
 
 // ---------------------------------------------------------------------------
 // Types — mirrors the content_items.submission_template jsonb shape.
+//
+// NOTE: title/description/instructions used to live in
+// ContentTemplateMetadata too, duplicating the real columns on
+// content_items (title/description/instructions). That meant the create/
+// edit form rendered two sets of Title/Description/Instructions inputs —
+// one from ContentItemFormModal bound to the actual columns, one from
+// here bound to a copy inside the jsonb blob that nothing ever read.
+// Removed here; content_items' own columns are the single source of
+// truth for those three fields everywhere (form, cards, detail pages).
 // ---------------------------------------------------------------------------
 
 export type ContentType = "assignment" | "course" | "resource";
@@ -64,9 +73,6 @@ export interface ContentTypeSpecific {
 export interface ContentTemplateMetadata {
   content_type: ContentType;
   submission_type: ContentSubmissionType;
-  title: string;
-  description: string;
-  instructions: string;
   /** true = mentees must submit to complete this item */
   is_required: boolean;
   /** true = mentees have no submission option at all */
@@ -80,7 +86,15 @@ interface ContentQuestionBase {
   question: string;
   /** Opt this question into pod/cohort analytics rollups. */
   analyticsEnabled?: boolean;
-  /** Key dashboards aggregate on when analyticsEnabled is true. */
+  /**
+   * Key dashboards aggregate on when analyticsEnabled is true. IMPORTANT:
+   * reuse the exact same string across every question meant to roll up
+   * together (e.g. always "confidence_rating" for any confidence question,
+   * on any assignment/course/resource) — the rollup groups strictly by
+   * this string. A metricKey unique to one question is valid but will
+   * only ever show that one item's own data, never combined with anything
+   * else. See lib/api/content-analytics.ts for the read side.
+   */
   metricKey?: string;
   showIf?: {
     questionId: string;
@@ -135,9 +149,6 @@ export function createDefaultSubmissionTemplate(contentType: ContentType): Conte
     metadata: {
       content_type: contentType,
       submission_type: contentType === "course" ? "recurring_update" : "single",
-      title: "",
-      description: "",
-      instructions: "",
       is_required: contentType !== "resource",
       is_not_required: contentType === "resource",
     },
@@ -224,11 +235,8 @@ export function ContentSubmissionTemplateEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <MetadataSection
-        contentType={contentType}
-        metadata={value.metadata}
+      <SubmissionRequirementSection
         requirement={requirement}
-        onPatch={patchMetadata}
         onRequirementChange={(req) => patchMetadata(requirementFlags(req))}
       />
 
@@ -244,11 +252,7 @@ export function ContentSubmissionTemplateEditor({
       {/*
         Gated identically for assignment/course/resource: if mentees have no
         submission at all ("No submission" / is_not_required), there is
-        nothing for extra questions to attach to. When a resource (or any
-        type) later has requirement flipped back to required/optional, any
-        previously-authored questions in value.additional_questions are
-        preserved untouched — they're just not rendered while hidden, and
-        not cleared, so a mentor toggling back and forth doesn't lose work.
+        nothing for extra questions to attach to.
       */}
       {canHaveQuestions && (
         <AdditionalQuestionsSection questions={value.additional_questions} onChange={setQuestions} />
@@ -258,7 +262,9 @@ export function ContentSubmissionTemplateEditor({
 }
 
 // ---------------------------------------------------------------------------
-// Metadata section
+// Submission requirement — the only "metadata" field left in this editor.
+// Title/description/instructions are content_items columns, edited in
+// ContentItemFormModal, not here.
 // ---------------------------------------------------------------------------
 
 const REQUIREMENT_OPTIONS: { value: SubmissionRequirement; label: string; hint: string }[] = [
@@ -267,75 +273,39 @@ const REQUIREMENT_OPTIONS: { value: SubmissionRequirement; label: string; hint: 
   { value: "disabled", label: "No submission", hint: "Mentees can't submit anything for this item" },
 ];
 
-interface MetadataSectionProps {
-  contentType: ContentType;
-  metadata: ContentTemplateMetadata;
+function SubmissionRequirementSection({
+  requirement,
+  onRequirementChange,
+}: {
   requirement: SubmissionRequirement;
-  onPatch: (patch: Partial<ContentTemplateMetadata>) => void;
   onRequirementChange: (requirement: SubmissionRequirement) => void;
-}
-
-function MetadataSection({ contentType, metadata, requirement, onPatch, onRequirementChange }: MetadataSectionProps) {
+}) {
   return (
-    <section className="surface-card flex flex-col gap-4 dark:surface-card">
+    <section className="surface-card flex flex-col gap-2 dark:surface-card">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted">
-        Details
+        Submission
       </h3>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-text-muted dark:text-text-muted">Title</label>
-        <input
-          value={metadata.title}
-          onChange={(e) => onPatch({ title: e.target.value })}
-          placeholder={contentType === "course" ? "e.g. Intro to Camera Basics" : "e.g. Week 3 Photo Essay"}
-          className="rounded-lg border border-border bg-card-alt px-3 py-2 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
-        />
+      <div className="inline-flex w-fit flex-wrap gap-1 rounded-full border border-border bg-card-alt p-1 dark:border-border dark:bg-card-alt">
+        {REQUIREMENT_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onRequirementChange(option.value)}
+            title={option.hint}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              requirement === option.value
+                ? "bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground"
+                : "text-text-muted hover:text-text-primary dark:text-text-muted dark:hover:text-text-primary"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-text-muted dark:text-text-muted">Description</label>
-        <textarea
-          value={metadata.description}
-          onChange={(e) => onPatch({ description: e.target.value })}
-          rows={2}
-          className="resize-none rounded-lg border border-border bg-card-alt px-3 py-2 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-text-muted dark:text-text-muted">Instructions for mentees</label>
-        <textarea
-          value={metadata.instructions}
-          onChange={(e) => onPatch({ instructions: e.target.value })}
-          rows={3}
-          className="resize-none rounded-lg border border-border bg-card-alt px-3 py-2 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium text-text-muted dark:text-text-muted">Submission</label>
-        <div className="inline-flex w-fit flex-wrap gap-1 rounded-full border border-border bg-card-alt p-1 dark:border-border dark:bg-card-alt">
-          {REQUIREMENT_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onRequirementChange(option.value)}
-              title={option.hint}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                requirement === option.value
-                  ? "bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground"
-                  : "text-text-muted hover:text-text-primary dark:text-text-muted dark:hover:text-text-primary"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <p className="flex items-center gap-1 text-xs text-text-muted dark:text-text-muted">
-          <Info className="h-3.5 w-3.5 shrink-0" />
-          {REQUIREMENT_OPTIONS.find((o) => o.value === requirement)?.hint}
-        </p>
-      </div>
+      <p className="flex items-center gap-1 text-xs text-text-muted dark:text-text-muted">
+        <Info className="h-3.5 w-3.5 shrink-0" />
+        {REQUIREMENT_OPTIONS.find((o) => o.value === requirement)?.hint}
+      </p>
     </section>
   );
 }
@@ -439,12 +409,8 @@ function TypeSpecificSection({
   onPatchAssignment,
   onPatchCourse,
 }: TypeSpecificSectionProps) {
-  // Resources genuinely have no type-specific fields — but unlike before,
-  // we don't render this section at all for resources rather than showing
-  // an empty-state message that reads as "resources are limited." The
-  // additional-questions section below (in the root component) is what
-  // actually carries resource-specific configuration now, and it's no
-  // longer implied to be off-limits.
+  // Resources genuinely have no type-specific fields — rendered as nothing
+  // rather than an empty-state message implying resources are limited.
   if (contentType === "resource") return null;
 
   return (
@@ -632,12 +598,6 @@ function ContentQuestionEditor({
 }: ContentQuestionEditorProps) {
   const meta = COMPONENT_META[question.component];
   const Icon = meta.icon;
-  // Derived during render: resolves the parent question this one is
-  // conditional on, if any. Works identically whether priorQuestions has
-  // 0 entries (first question in a freshly-created resource template) or
-  // N entries — showIf simply won't be settable until a prior question
-  // exists, and any existing showIf pointing at a since-removed question
-  // was already cleared by removeQuestion above.
   const parentQuestion = question.showIf
     ? priorQuestions.find((p) => p.id === question.showIf?.questionId)
     : undefined;
@@ -820,6 +780,9 @@ function ContentQuestionEditor({
         <button
           type="button"
           onClick={() => onPatch({ analyticsEnabled: !question.analyticsEnabled })}
+          title={
+            "Groups this question's answers with every other question across any assignment/course/resource that uses the same metric key below. A metric key used on only one question just tracks that item on its own — reuse the same key wherever you want combined numbers."
+          }
           className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
             question.analyticsEnabled
               ? "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
@@ -834,6 +797,7 @@ function ContentQuestionEditor({
             value={question.metricKey ?? ""}
             onChange={(e) => onPatch({ metricKey: e.target.value })}
             placeholder="metric key, e.g. confidence_rating"
+            title="Reuse this exact key on other questions to combine their answers into one rollup — different keys never get grouped together."
             className="rounded border border-border bg-card px-2 py-1 text-[11px] text-text-primary dark:border-border dark:bg-card dark:text-text-primary"
           />
         )}

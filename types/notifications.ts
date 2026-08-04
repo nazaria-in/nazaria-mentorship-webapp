@@ -1,67 +1,74 @@
-// /lib/types/notifications.ts
+// /types/notifications.ts
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database.types";
-
-export type NotificationType = Database["public"]["Enums"]["notification_type"];
 
 /**
- * All three client factories in this project (lib/supabase/client's
- * browser client, lib/supabase/server's server client, and
- * lib/supabase/admin's service-role client) return SupabaseClient<Database>
- * — so every function below takes this as a parameter instead of creating
- * its own client. That's what makes the same functions callable from
- * client-side mutations (submitVersion, sendMessage, ...) and from server
- * routes (meetings PATCH/POST) without duplicating logic per context.
+ * RECONSTRUCTED from confirmed real usage across lib/api/notifications.ts,
+ * lib/notifications/{meeting,exit-survey,message}-notifications.ts, and
+ * lib/notifications/card-actions.ts — all five were shared as real,
+ * current files, so every field below is backed by an actual read/write
+ * site, not a guess. The one substantive change from what those files
+ * currently do: `menteeAssignmentId`/`resourceId` (camelCase, on
+ * CreateNotificationInput) and `mentee_assignment_id`/`resource_id`
+ * (snake_case, on the row type card-actions.ts reads) are replaced with
+ * `contentDispatchId`/`content_dispatch_id` and
+ * `contentSubmissionId`/`content_submission_id` — matching the real
+ * `notifications` table columns you confirmed. The old columns don't
+ * exist on the live table; every file still referencing them (notifications.ts's
+ * insert, card-actions.ts's switch) was writing/reading fields that 500 or
+ * silently return undefined against the real schema.
  */
-export type NotificationsClient = SupabaseClient<Database>;
+
+export type NotificationType =
+  | "meeting_invite"
+  | "meeting_started"
+  | "assignment_due"
+  | "assignment_submitted"
+  | "assignment_reviewed"
+  | "exit_survey_pending"
+  | "message"
+  | "reminder"
+  | "achievement";
+
+/** The real supabase-js client satisfies everything lib/api/notifications.ts needs structurally. */
+export type NotificationsClient = SupabaseClient;
 
 export interface CreateNotificationInput {
   createdBy: string | null;
   type: NotificationType;
   title: string;
-  body?: string;
+  body?: string | null;
   recipientUserIds: string[];
-  /** Omit or set to a past/now timestamp for "send on next cron tick". */
+  /** Defaults to "now" (immediate) when omitted. */
   scheduledFor?: Date;
   meetingId?: string;
-  menteeAssignmentId?: string;
   exitSurveyId?: string;
   messageId?: string;
-  resourceId?: string;
-  actionItems?: string;
+  /** REPLACES the old `menteeAssignmentId` — see file header. */
+  contentDispatchId?: string;
+  /** REPLACES the old `resourceId` — see file header. */
+  contentSubmissionId?: string;
 }
 
-export interface NotificationRow {
+/** Mirrors the real `notifications` table row (snake_case = actual column names). */
+export interface Notification {
   id: string;
   created_by: string | null;
   type: NotificationType;
   title: string;
   body: string | null;
-  scheduled_for: string;
   meeting_id: string | null;
-  mentee_assignment_id: string | null;
   exit_survey_id: string | null;
   message_id: string | null;
-  resource_id: string | null;
+  content_dispatch_id: string | null;
+  content_submission_id: string | null;
+  scheduled_for: string | null;
+  created_at: string;
+  deleted_at: string | null;
   action_items: string | null;
-  created_at: string;
-  deleted_at: string | null;
 }
 
-export interface UserNotificationRow {
-  id: string;
-  notification_id: string;
-  user_id: string;
-  status: Database["public"]["Enums"]["notification_delivery_status"];
-  sent_at: string | null;
-  read_at: string | null;
-  created_at: string;
-  deleted_at: string | null;
-}
-
-/** A notification joined with its own delivery/read row — what the UI renders. */
-export interface NotificationWithDelivery extends NotificationRow {
+export interface NotificationWithDelivery extends Notification {
   userNotificationId: string;
   readAt: string | null;
 }

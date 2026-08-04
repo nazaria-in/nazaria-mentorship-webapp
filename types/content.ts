@@ -30,6 +30,15 @@ export interface ContentItem {
   created_by: string;
   created_at: string;
   deleted_at: string | null;
+  /**
+   * Submission window — required by content_items_submission_window_check
+   * whenever submission_template.metadata.is_not_required is false. Both
+   * are null only for "No submission" items. This is what the future
+   * timeline view and the reminder-cascade rewrite (todo §G) anchor on
+   * instead of a template-level start_date, which content_items never had.
+   */
+  submission_starts_at: string | null;
+  submission_ends_at: string | null;
 }
 
 export interface ContentItemWithMeta extends ContentItem {
@@ -122,4 +131,22 @@ export interface ContentSubmission {
   reviewed_at: string | null;
   feedback: string | null;
   submitted_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Analytics — denormalized rollup rows written at submission time for any
+// additional_questions entry with analyticsEnabled: true. See §F in the
+// todo doc; this table doesn't exist as a migration yet, only the type +
+// the write-path stub in lib/api/content-submissions.ts.
+// ---------------------------------------------------------------------------
+
+export interface ContentAnalyticsAnswer {
+  id: string;
+  content_submission_id: string;
+  content_item_id: string;
+  question_id: string;
+  metric_key: string;
+  /** Mirrors AdditionalQuestionAnswerValue, stored as jsonb so numeric/array/string all fit one column. */
+  value: AdditionalQuestionAnswerValue;
+  created_at: string;
 }

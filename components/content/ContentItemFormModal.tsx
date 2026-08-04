@@ -60,6 +60,12 @@ export interface ContentItemFormModalProps {
 
 type Step = "details" | "roster";
 
+/** yyyy-mm-dd for a native <input type="date">, from an ISO timestamp or null. */
+function toDateInputValue(iso: string | null): string {
+  if (!iso) return "";
+  return iso.slice(0, 10);
+}
+
 export function ContentItemFormModal({
   open,
   onClose,
@@ -80,6 +86,13 @@ export function ContentItemFormModal({
   const [weekId, setWeekId] = React.useState<string | null>(null);
   const [tagIds, setTagIds] = React.useState<string[]>([]);
   const [template, setTemplate] = React.useState<ContentSubmissionTemplate>(defaultTemplateFor(initialContentType));
+  // Submission window — required by content_items_submission_window_check
+  // whenever the resolved requirement isn't "disabled". Kept as plain date
+  // strings here (native <input type="date"> shape) and converted to ISO
+  // only at save time; null/null is only ever sent when requirement is
+  // "disabled", matching the DB constraint exactly.
+  const [submissionStartsAt, setSubmissionStartsAt] = React.useState("");
+  const [submissionEndsAt, setSubmissionEndsAt] = React.useState("");
   const [workingItem, setWorkingItem] = React.useState<ContentItemWithMeta | null>(null);
   const [selectedMenteeIds, setSelectedMenteeIds] = React.useState<string[]>([]);
   const [dueAt, setDueAt] = React.useState("");
@@ -118,6 +131,8 @@ export function ContentItemFormModal({
       setWeekId(existingItem.week_id);
       setTagIds(existingItem.tags.map((t) => t.id));
       setTemplate(existingItem.submission_template);
+      setSubmissionStartsAt(toDateInputValue(existingItem.submission_starts_at));
+      setSubmissionEndsAt(toDateInputValue(existingItem.submission_ends_at));
       hasHydrated.current = true;
     }
   }, [existingItem, mode]);
@@ -147,6 +162,19 @@ export function ContentItemFormModal({
     return map;
   }, [assignedRefs]);
 
+  // Derived during render — no effect needed. Drives both whether the
+  // window date fields render at all and whether they're required before
+  // save (must match content_items_submission_window_check exactly: null
+  // window is only valid when is_not_required is true).
+  const requirement = template.metadata.is_not_required
+    ? "disabled"
+    : template.metadata.is_required
+    ? "required"
+    : "optional";
+  const submissionWindowRequired = requirement !== "disabled";
+  const canSubmitDetails =
+    title.trim().length > 0 && (!submissionWindowRequired || (submissionStartsAt !== "" && submissionEndsAt !== ""));
+
   function handleTypeChange(next: ContentType) {
     if (next === contentType) return;
     if (hasEditedTemplate.current) {
@@ -167,6 +195,13 @@ export function ContentItemFormModal({
 
   const saveDetailsMutation = useMutation({
     mutationFn: async () => {
+      // Belt-and-suspenders alongside the disabled Continue button: never
+      // send a populated window for a "No submission" item, and never send
+      // an empty window for anything else — this must match
+      // content_items_submission_window_check or the insert/update 500s.
+      const windowStartsAt = submissionWindowRequired && submissionStartsAt ? new Date(submissionStartsAt).toISOString() : null;
+      const windowEndsAt = submissionWindowRequired && submissionEndsAt ? new Date(submissionEndsAt).toISOString() : null;
+
       if (mode === "create") {
         return createContentItem({
           content_type: contentType,
@@ -177,6 +212,8 @@ export function ContentItemFormModal({
           submission_template: template,
           created_by: currentUserId,
           tag_ids: tagIds,
+          submission_starts_at: windowStartsAt,
+          submission_ends_at: windowEndsAt,
         });
       }
       return updateContentItem({
@@ -187,6 +224,8 @@ export function ContentItemFormModal({
         week_id: weekId,
         submission_template: template,
         tag_ids: tagIds,
+        submission_starts_at: windowStartsAt,
+        submission_ends_at: windowEndsAt,
       });
     },
     onSuccess: (saved) => {
@@ -201,11 +240,25 @@ export function ContentItemFormModal({
       if (!target) throw new Error("No content item to assign mentees to");
       const newIds = selectedMenteeIds.filter((id) => !effectiveCommittedIds.includes(id));
       if (newIds.length === 0) return;
+      // Derived from `target` (the just-saved/loaded row), not local form
+      // state — target.submission_starts_at/ends_at are the authoritative
+      // saved values (already ISO), and its own metadata is the source of
+      // truth for requirement, avoiding any drift from what's currently in
+      // the (possibly since-edited-but-not-saved) form fields.
+      const targetRequirement = target.submission_template.metadata.is_not_required
+        ? "disabled"
+        : target.submission_template.metadata.is_required
+        ? "required"
+        : "optional";
       return dispatchContentItem({
         contentItemId: target.id,
         menteeIds: newIds,
         assignedBy: currentUserId,
         dueAt: dueAt || null,
+        contentItemTitle: target.title,
+        requirement: targetRequirement,
+        submissionStartsAt: target.submission_starts_at,
+        submissionEndsAt: target.submission_ends_at,
       });
     },
     onSuccess: () => {
@@ -231,6 +284,8 @@ export function ContentItemFormModal({
     setWeekId(null);
     setTagIds([]);
     setTemplate(defaultTemplateFor(initialContentType));
+    setSubmissionStartsAt("");
+    setSubmissionEndsAt("");
     setWorkingItem(null);
     setSelectedMenteeIds([]);
     setDueAt("");
@@ -245,7 +300,6 @@ export function ContentItemFormModal({
     onClose();
   }
 
-  const canSubmitDetails = title.trim().length > 0;
   const canFinishRoster = mode === "create" ? selectedMenteeIds.length > 0 : true;
 
   return (
@@ -332,6 +386,37 @@ export function ContentItemFormModal({
             <div className="border-t border-border pt-4 dark:border-border">
               <ContentSubmissionTemplateEditor contentType={contentType} value={template} onChange={handleTemplateChange} />
             </div>
+
+            {/*
+              Placed right after the template editor (not before it) since
+              its visibility depends on the requirement control living
+              inside ContentSubmissionTemplateEditor's metadata section —
+              reads as "here's when submissions are open" immediately after
+              "here's what the submission asks for." Hidden entirely for
+              "No submission" items, matching the DB constraint: a
+              disabled item has no window, period.
+            */}
+            {submissionWindowRequired && (
+              <Field label="Submission window">
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={submissionStartsAt}
+                    onChange={(e) => setSubmissionStartsAt(e.target.value)}
+                    className={inputClass}
+                  />
+                  <input
+                    type="date"
+                    value={submissionEndsAt}
+                    onChange={(e) => setSubmissionEndsAt(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted">
+                  When mentees can submit. Powers the calendar/timeline view and due-date reminders.
+                </p>
+              </Field>
+            )}
 
             {saveDetailsMutation.isError && (
               <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive dark:bg-destructive/15">

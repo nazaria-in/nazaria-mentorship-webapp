@@ -2,7 +2,6 @@
 
 import { NotificationWithDelivery } from "@/types/notifications";
 
-
 export interface NotificationCardAction {
   label: string;
   href: string;
@@ -12,14 +11,26 @@ export interface NotificationCardAction {
  * meeting_invite is handled separately by NotificationCard (Accept/Decline
  * buttons, not a link) — returns null for it on purpose.
  *
- * Two known simplifications, flagged rather than silently guessed around:
+ * CHANGED: every case that used to key off `mentee_assignment_id` now uses
+ * `content_dispatch_id` (the real column — see types/notifications.ts).
+ * `resource_id` never existed as a real column and is removed outright
+ * rather than swapped, since resources are content_items now and route
+ * through content_dispatch_id like everything else — there's no separate
+ * "resource" case anymore, assignment/course/resource notifications all
+ * resolve the same way.
+ *
+ * Hrefs point at /assignments_and_courses/dispatch/{content_dispatch_id},
+ * a thin server redirect that resolves the dispatch to its content item
+ * and forwards there — see that route's file header for why this
+ * indirection exists instead of linking directly.
+ *
+ * Two known simplifications, flagged rather than silently guessed around
+ * (unchanged from before):
  *  - `message` notifications don't carry conversation_id (only message_id
  *    is on the notifications table), so this links to /chat generally
- *    rather than the specific thread. Fix requires either adding
- *    conversation_id to notifications or a join at render time.
- *  - `meeting_started` doesn't carry meet_link (not stored on the
- *    notification row), so it links to the meeting page rather than
- *    opening the call directly. Same fix shape as above.
+ *    rather than the specific thread.
+ *  - `meeting_started` doesn't carry meet_link, so it links to the
+ *    meeting page rather than opening the call directly.
  */
 export function getNotificationAction(notification: NotificationWithDelivery): NotificationCardAction | null {
   switch (notification.type) {
@@ -27,11 +38,10 @@ export function getNotificationAction(notification: NotificationWithDelivery): N
       return null;
 
     case "reminder":
+      // resource_id branch removed — no longer a real column. Meeting
+      // reminders are the only "reminder"-typed notification left.
       if (notification.meeting_id) {
         return { label: "View meeting", href: `/meetings?highlight=${notification.meeting_id}` };
-      }
-      if (notification.resource_id) {
-        return { label: "Add update", href: `/resources/${notification.resource_id}` };
       }
       return null;
 
@@ -50,23 +60,23 @@ export function getNotificationAction(notification: NotificationWithDelivery): N
     }
 
     case "assignment_due":
-      return notification.mentee_assignment_id
-        ? { label: "View assignment", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
+      return notification.content_dispatch_id
+        ? { label: "View item", href: `/assignments_and_courses/dispatch/${notification.content_dispatch_id}` }
         : null;
 
     case "assignment_submitted":
-      return notification.mentee_assignment_id
-        ? { label: "Review submission", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
+      return notification.content_dispatch_id
+        ? { label: "Review submission", href: `/assignments_and_courses/dispatch/${notification.content_dispatch_id}` }
         : null;
 
     case "assignment_reviewed":
-      return notification.mentee_assignment_id
-        ? { label: "View feedback", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
+      return notification.content_dispatch_id
+        ? { label: "View feedback", href: `/assignments_and_courses/dispatch/${notification.content_dispatch_id}` }
         : null;
 
     case "achievement":
-      return notification.mentee_assignment_id
-        ? { label: "View assignment", href: `/assignments/via-mentee/${notification.mentee_assignment_id}` }
+      return notification.content_dispatch_id
+        ? { label: "View item", href: `/assignments_and_courses/dispatch/${notification.content_dispatch_id}` }
         : null;
 
     case "message":

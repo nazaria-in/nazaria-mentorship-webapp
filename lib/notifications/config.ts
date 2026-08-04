@@ -36,3 +36,32 @@ export const OVERDUE_REMINDER_SPACING_DAYS = 3;
 
 /** How stale a resource's last update must be before the weekly nudge fires. */
 export const RESOURCE_STALE_DAYS = 7;
+
+// ---------------------------------------------------------------------------
+// ADDED — content_items reminder cascade (lib/notifications/content-notifications.ts).
+// Everything above this line is unchanged from the existing file.
+// ---------------------------------------------------------------------------
+
+/**
+ * Percent-through-window marks for the REQUIRED-submission content
+ * reminder cascade (submission_starts_at → submission_ends_at). Same
+ * 40/70/90 marks as the old per-assignment cascade
+ * (ASSIGNMENT_REMINDER_PERCENTS above, kept as-is since other code may
+ * still reference it) — reused here under a content-model-scoped name so
+ * the two aren't accidentally conflated later if they ever diverge.
+ */
+export const CONTENT_REMINDER_PERCENTS = {
+  fortyPercent: 0.4,
+  seventyPercent: 0.7,
+  ninetyPercent: 0.9,
+} as const;
+
+/**
+ * When a content_item's submission_starts_at is a bare date (midnight,
+ * from the date-only picker in ContentItemFormModal) rather than a real
+ * time-of-day, the first reminder fires at this hour UTC instead of at
+ * midnight. "Let's say 9am for everything that doesn't have time" — your
+ * words; change this one value if 9am UTC isn't the right anchor for your
+ * users' actual timezone distribution.
+ */
+export const CONTENT_REMINDER_START_HOUR_UTC = 9;
