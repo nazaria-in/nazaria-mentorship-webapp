@@ -1,4 +1,4 @@
-// /app/meetings/page.tsx
+// /app/meetings/page.tsx — full file, only meetingsQuery changed
 
 "use client";
 
@@ -58,15 +58,30 @@ export default function MeetingsPage(): React.JSX.Element {
   // fetchContentItemsDueInRange for why.
   const isMenteeView = role === "mentee";
 
+  // Mentors only see content items THEY created on the timeline, matching
+  // /app/assignments_and_courses/page.tsx's scopeToCreatedBy. Staff
+  // (pm/associate) get no scope — they see everything, same as before.
+  const scopeToCreatedBy = role === "mentor" ? (userId ?? undefined) : undefined;
+
   const handleRangeChange = React.useCallback((rangeStartIso: string, rangeEndIso: string) => {
     setRange({ start: rangeStartIso, end: rangeEndIso });
   }, []);
 
+  // `role` is `Role | null` while the session is still resolving — was
+  // being passed directly into fetchMeetingsInRange's `role: UserRole`
+  // param, which is where the "Type 'Role | null' is not assignable to
+  // type 'UserRole'" error came from. Fixed the same way as
+  // MeetingFormModal: gate the query on role !== null instead of casting
+  // past the null, so queryFn is never actually invoked with one.
   const meetingsQuery = useQuery({
     queryKey: ["meetings", userId, role, range?.start, range?.end],
-    queryFn: () =>
-      fetchMeetingsInRange({ userId: userId ?? null, role, rangeStart: range!.start, rangeEnd: range!.end }),
-    enabled: Boolean(range) && (Boolean(userId) || isDebugStaffPreview),
+    queryFn: () => {
+      if (!role) {
+        return Promise.reject(new Error("Role not loaded yet"));
+      }
+      return fetchMeetingsInRange({ userId: userId ?? null, role, rangeStart: range!.start, rangeEnd: range!.end });
+    },
+    enabled: Boolean(range) && role !== null && (Boolean(userId) || isDebugStaffPreview),
   });
 
   const inPersonSessionsQuery = useQuery({
@@ -82,8 +97,8 @@ export default function MeetingsPage(): React.JSX.Element {
   });
 
   const contentItemsQuery = useQuery({
-    queryKey: ["content-items-timeline", range?.start, range?.end],
-    queryFn: () => fetchContentItemsDueInRange(range!.start, range!.end),
+    queryKey: ["content-items-timeline", range?.start, range?.end, scopeToCreatedBy],
+    queryFn: () => fetchContentItemsDueInRange(range!.start, range!.end, scopeToCreatedBy),
     enabled: Boolean(range) && !isMenteeView && (Boolean(userId) || isDebugStaffPreview),
   });
 
@@ -207,9 +222,6 @@ export default function MeetingsPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Collapsed by default, badge-only when closed — mounted above the
-          calendar (never inline with it) so it can never push meeting
-          content around or compete for attention with the timeline. */}
       {showOwnPendingSurveys && userId && <PendingExitSurveysWidget userId={userId} />}
 
       {(pendingInvitesQuery.data?.length ?? 0) > 0 && userId && (

@@ -38,8 +38,9 @@ export function getNotificationAction(notification: NotificationWithDelivery): N
       return null;
 
     case "reminder":
-      // resource_id branch removed — no longer a real column. Meeting
-      // reminders are the only "reminder"-typed notification left.
+      if (notification.content_dispatch_id) {
+        return { label: "View item", href: `/assignments_and_courses/dispatch/${notification.content_dispatch_id}` };
+      }
       if (notification.meeting_id) {
         return { label: "View meeting", href: `/meetings?highlight=${notification.meeting_id}` };
       }

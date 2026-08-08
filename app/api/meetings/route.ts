@@ -11,7 +11,7 @@ import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning"
 
 
 import { notifyMeetingInvite, scheduleMeetingReminders } from "@/lib/notifications/meeting-notifications";
-import { scheduleExitSurveyReminders } from "@/lib/notifications/exit-survey-notifications";
+import { scheduleExitSurveyReminders, scheduleExitSurveyOverdueReminder } from "@/lib/notifications/exit-survey-notifications";
 
 
 interface CreateMeetingRequestBody {
@@ -214,15 +214,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           meetingId,
         });
       } else if (createdSurveyRows && createdSurveyRows.length > 0) {
-        await scheduleExitSurveyReminders(
-          admin,
-          createdSurveyRows.map((row) => ({
-            exitSurveyId: row.id as string,
-            submitterUserId: row.user_id as string,
-            meetingTitle: meeting.title as string,
-          })),
-          { startsAt: meeting.starts_at as string, endsAt: meeting.ends_at as string }
-        );
+        const pendingRows = createdSurveyRows.map((row) => ({
+          exitSurveyId: row.id as string,
+          submitterUserId: row.user_id as string,
+          meetingTitle: meeting.title as string,
+        }));
+
+        await scheduleExitSurveyReminders(admin, pendingRows, {
+          startsAt: meeting.starts_at as string,
+          endsAt: meeting.ends_at as string,
+        });
+
+        // ADDED: overdue nudge, fired once per row at meeting ends_at.
+        // Same fire-and-continue posture as the reminder above — one
+        // row's failure shouldn't block the others or the response.
+        for (const row of pendingRows) {
+          try {
+            await scheduleExitSurveyOverdueReminder(admin, row, meeting.ends_at as string);
+          } catch (overdueError) {
+            console.error("[meetings] Failed to schedule overdue exit survey reminder", overdueError, {
+              meetingId,
+              exitSurveyId: row.exitSurveyId,
+            });
+          }
+        }
       }
     }
   } catch (exitSurveyError) {

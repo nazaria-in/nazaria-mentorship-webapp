@@ -2,6 +2,7 @@
 
 import { createNotification, cancelPendingNotifications } from "@/lib/api/notifications";
 import type { NotificationsClient } from "@/types/notifications";
+import { CONTENT_REMINDER_PERCENTS } from "./config";
 
 export interface ContentReminderInput {
   contentDispatchId: string;
@@ -112,6 +113,61 @@ export async function notifyContentCompleted(
     title: `${input.contentItemTitle} — completed!`,
     body: "This has been marked complete.",
     recipientUserIds: [input.menteeId],
+    contentDispatchId: input.contentDispatchId,
+  });
+}
+
+export async function scheduleContentDeadlineReminders(
+  supabase: NotificationsClient,
+  input: {
+    contentDispatchId: string;
+    menteeId: string;
+    contentItemTitle: string;
+    submissionStartsAt: string | null;
+    submissionEndsAt: string | null;
+  }
+): Promise<void> {
+  // Not-required items (submission_template.metadata.is_not_required) have
+  // no window at all — the DB check constraint guarantees start+end are
+  // only both-null in that case, so this guard doubles as that detection.
+  if (!input.submissionStartsAt || !input.submissionEndsAt) return;
+
+  const startMs = new Date(input.submissionStartsAt).getTime();
+  const endMs = new Date(input.submissionEndsAt).getTime();
+  const now = Date.now();
+
+  const stages = [
+    { pct: CONTENT_REMINDER_PERCENTS.fortyPercent, label: "40% through the window" },
+    { pct: CONTENT_REMINDER_PERCENTS.seventyPercent, label: "70% through the window" },
+  ];
+
+  for (const stage of stages) {
+    const scheduledForMs = startMs + stage.pct * (endMs - startMs);
+    if (scheduledForMs <= now) continue;
+    await createNotification(supabase, {
+      createdBy: null,
+      type: "reminder",
+      title: `${input.contentItemTitle} — ${stage.label}`,
+      body: "This is due soon.",
+      recipientUserIds: [input.menteeId],
+      scheduledFor: new Date(scheduledForMs),
+      contentDispatchId: input.contentDispatchId,
+    });
+  }
+
+  // Overdue: fires once, right at the window's end. The view suppresses
+  // this automatically if content_dispatches.completed_at gets set before
+  // scheduled_for arrives — no manual cancellation needed for this one,
+  // unlike the meeting cascade, precisely because it's a view-gated read
+  // rather than a cron-dispatched write.
+  const overdueMs = Math.max(endMs, now);
+  await createNotification(supabase, {
+    createdBy: null,
+    type: "reminder",
+    title: `${input.contentItemTitle} — overdue`,
+    body: "This is now past its submission window.",
+    recipientUserIds: [input.menteeId],
+    scheduledFor: new Date(overdueMs),
     contentDispatchId: input.contentDispatchId,
   });
 }

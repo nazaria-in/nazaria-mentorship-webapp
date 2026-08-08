@@ -10,7 +10,7 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 
 const NO_SHELL_PREFIXES = ["/auth", "/onboarding"];
-const REQUIRES_APPROVAL_ROLES = ["mentee", "associate", "pm"];
+const REQUIRES_APPROVAL_ROLES = ["mentor", "associate", "pm"];
 
 function titleFromPath(pathname: string): string {
   const seg = pathname.split("/")[1];

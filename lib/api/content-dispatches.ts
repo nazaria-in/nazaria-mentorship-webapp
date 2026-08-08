@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase/client";
 import {
   scheduleContentReminders,
+  scheduleContentDeadlineReminders,
   cancelContentReminders,
   notifyContentCompleted,
 } from "@/lib/notifications/content-notifications";
@@ -65,8 +66,8 @@ export async function dispatchContentItem({
   // succeeded above.
   const rows = (inserted ?? []) as { id: string; mentee_id: string }[];
   await Promise.all(
-    rows.map((row) =>
-      scheduleContentReminders(supabase, {
+    rows.map(async (row) => {
+      await scheduleContentReminders(supabase, {
         contentDispatchId: row.id,
         menteeId: row.mentee_id,
         contentItemTitle,
@@ -74,9 +75,24 @@ export async function dispatchContentItem({
         submissionStartsAt,
         submissionEndsAt,
       }).catch((err) => {
-        console.error("[content-dispatches] Failed to schedule reminders for dispatch", row.id, err);
-      })
-    )
+        console.error("[content-dispatches] Failed to schedule assignment ping for dispatch", row.id, err);
+      });
+
+      // Deadline cascade (40%/70%/overdue) is separate from the assignment
+      // ping above and only makes sense for required submissions — no
+      // point nudging toward a deadline that doesn't gate anything.
+      if (requirement === "required") {
+        await scheduleContentDeadlineReminders(supabase, {
+          contentDispatchId: row.id,
+          menteeId: row.mentee_id,
+          contentItemTitle,
+          submissionStartsAt,
+          submissionEndsAt,
+        }).catch((err) => {
+          console.error("[content-dispatches] Failed to schedule deadline reminders for dispatch", row.id, err);
+        });
+      }
+    })
   );
 }
 
@@ -154,18 +170,18 @@ interface RawAssignmentStatusRow {
 }
 
 /**
- * A mentee item is visible once its submission window has opened (or it
- * has no window at all — e.g. "No submission" resources). Filters using
- * millisecond comparison rather than string comparison since
- * submission_starts_at ISO strings from Postgres aren't guaranteed to be
- * lexically sortable against `new Date().toISOString()` (offset format
- * can differ). Applied only on the mentee read path — staff/mentor still
- * see everything regardless of window, since they're the ones setting it.
+ * REMOVED: isVisibleToMenteeNow() used to gate fetchMenteeContentDispatches
+ * so items with a future submission_starts_at were dropped entirely before
+ * the mentee ever saw them. Per the Final Cleanup doc §7 ("mentees must
+ * see ALL assignments assigned to them, regardless of start/end time —
+ * do not hide assignments simply because their start time has passed"),
+ * that's the actual bug: it wasn't a page-level filtering issue, it was
+ * a fetch-level exclusion, so no client-side filter could ever recover
+ * these rows. The concept isn't deleted, just demoted from a hard filter
+ * to informational — it now only feeds the "Has started"/"Not started"
+ * status chips added in the page component, alongside the item itself
+ * always being fetched and shown under "All".
  */
-function isVisibleToMenteeNow(item: ContentItemWithMeta): boolean {
-  if (!item.submission_starts_at) return true;
-  return new Date(item.submission_starts_at).getTime() <= Date.now();
-}
 
 /**
  * Mentee-facing fetch, split by content type because only assignments have
@@ -182,8 +198,9 @@ export async function fetchMenteeContentDispatches(menteeId: string, contentType
     .is("content_item.deleted_at", null);
   if (error) throw error;
 
-  const allRows = (data ?? []) as unknown as RawDispatchRow[];
-  const rows = allRows.filter((row) => isVisibleToMenteeNow(row.content_item));
+  // No visibility filter here anymore — every non-deleted dispatch for
+  // this mentee is returned, regardless of submission_starts_at/ends_at.
+  const rows = (data ?? []) as unknown as RawDispatchRow[];
 
   if (contentType !== "assignment") {
     return rows.map((row) => ({
@@ -217,8 +234,10 @@ export async function fetchMenteeContentDispatches(menteeId: string, contentType
 }
 
 /**
- * Single-dispatch fetch. SCHEMA GAP CARRIED FORWARD: unlike
- * fetchMenteeContentDispatches, this does NOT gate on isVisibleToMenteeNow.
+ * Single-dispatch fetch. Never had the visibility gate to begin with
+ * (comment above used to flag that inconsistency as a gap — it's now
+ * consistent with fetchMenteeContentDispatches, since neither filters
+ * by window anymore).
  */
 export async function fetchDispatchById(dispatchId: string): Promise<MenteeContentDispatch> {
   const { data, error } = await supabase

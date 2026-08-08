@@ -65,8 +65,9 @@ function normalizeContentItemRow(row: RawContentItemRow): ContentItemWithMeta {
 export async function fetchContentItemsDueInRange(
   rangeStartIso: string,
   rangeEndIso: string,
+  scopeToCreatedBy?: string,
 ): Promise<ContentItemWithMeta[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("content_items")
     .select("*, week:weeks(*), content_item_tags(tag:tags(*))")
     .is("deleted_at", null)
@@ -75,6 +76,9 @@ export async function fetchContentItemsDueInRange(
     .gte("submission_ends_at", rangeStartIso)
     .lt("submission_ends_at", rangeEndIso);
 
+  if (scopeToCreatedBy) query = query.eq("created_by", scopeToCreatedBy);
+
+  const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as unknown as RawContentItemRow[]).map(normalizeContentItemRow);
 }

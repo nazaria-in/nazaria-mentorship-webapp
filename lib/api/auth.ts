@@ -113,24 +113,27 @@ export async function updateUserProfile({
   interests,
   schoolOrOrg,
 }: UserProfileInput) {
-  const supabase = createClient();
+  const updates: Record<string, string | string[] | null> = {};
 
+  if (fullName !== undefined) updates.full_name = fullName;
+  if (bio !== undefined) updates.bio = bio || null; // empty bio -> null, not ""
+  if (backgroundNotes !== undefined) updates.background_notes = backgroundNotes;
+  if (goals !== undefined) updates.goals = goals;
+  if (interests !== undefined) updates.interests = interests;
+  if (schoolOrOrg !== undefined) updates.school_or_org = schoolOrOrg;
+
+  if (Object.keys(updates).length === 0) return;
+
+  updates.updated_at = new Date().toISOString();
+
+  const supabase = createClient();
   const { error } = await supabase
     .from("users")
-    .update({
-      full_name: fullName,
-      bio,
-      background_notes: backgroundNotes,
-      goals,
-      interests,
-      school_or_org: schoolOrOrg,
-      updated_at: new Date().toISOString(), // explicitly sets the update timestamp
-    })
+    .update(updates)
     .eq("id", userId);
 
   if (error) throw error;
 }
-
 /**
  * Re-fetches the current auth user + their public.users profile row and
  * writes it straight into the session store (bypassing React state/props,

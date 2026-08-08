@@ -162,6 +162,8 @@ export function ContentItemFormModal({
     return map;
   }, [assignedRefs]);
 
+
+
   // Derived during render — no effect needed. Drives both whether the
   // window date fields render at all and whether they're required before
   // save (must match content_items_submission_window_check exactly: null
@@ -172,8 +174,17 @@ export function ContentItemFormModal({
     ? "required"
     : "optional";
   const submissionWindowRequired = requirement !== "disabled";
+  const submissionWindowInvalid =
+    submissionWindowRequired &&
+    submissionStartsAt !== "" &&
+    submissionEndsAt !== "" &&
+    new Date(submissionEndsAt).getTime() < new Date(submissionStartsAt).getTime();
+
+
   const canSubmitDetails =
-    title.trim().length > 0 && (!submissionWindowRequired || (submissionStartsAt !== "" && submissionEndsAt !== ""));
+    title.trim().length > 0 &&
+    (!submissionWindowRequired || (submissionStartsAt !== "" && submissionEndsAt !== "")) &&
+    !submissionWindowInvalid;
 
   function handleTypeChange(next: ContentType) {
     if (next === contentType) return;
@@ -231,6 +242,12 @@ export function ContentItemFormModal({
     onSuccess: (saved) => {
       setWorkingItem(saved);
       setStep("roster");
+    },
+    onError: (error: unknown) => {
+      // Fallback only — the frontend guard above should make this
+      // unreachable via the UI, but a constraint violation is more useful
+      // surfaced than swallowed if something bypasses the guard.
+      console.error("content item save failed", error);
     },
   });
 
@@ -408,10 +425,17 @@ export function ContentItemFormModal({
                   <input
                     type="date"
                     value={submissionEndsAt}
+                    min={submissionStartsAt || undefined}
                     onChange={(e) => setSubmissionEndsAt(e.target.value)}
-                    className={inputClass}
+                    aria-invalid={submissionWindowInvalid}
+                    className={`${inputClass} aria-[invalid=true]:border-destructive dark:aria-[invalid=true]:border-destructive`}
                   />
                 </div>
+                {submissionWindowInvalid && (
+                  <p className="mt-1 text-[11px] text-destructive dark:text-destructive">
+                    End date can&apos;t be before the start date.
+                  </p>
+                )}
                 <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted">
                   When mentees can submit. Powers the calendar/timeline view and due-date reminders.
                 </p>

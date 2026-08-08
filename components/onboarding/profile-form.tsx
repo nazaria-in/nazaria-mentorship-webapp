@@ -25,7 +25,7 @@ export function ProfileForm() {
   const [error, setError] = useState<string | null>(null);
 
 
-  const canSubmit = bio.trim().length > 0 && !submitting;
+  const canSubmit = !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

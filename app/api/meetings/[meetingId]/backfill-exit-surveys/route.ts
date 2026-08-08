@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning";
-import { scheduleExitSurveyReminders } from "@/lib/notifications/exit-survey-notifications";
+import { scheduleExitSurveyReminders, scheduleExitSurveyOverdueReminder } from "@/lib/notifications/exit-survey-notifications";
 import type { UserRole } from "@/types/users";
 
 interface RouteParams {
@@ -18,10 +18,10 @@ interface RouteParams {
  * ignoreDuplicates on (meeting_id, user_id, subject_user_id), so it never
  * clobbers an already-submitted row.
  *
- * Also schedules exit-survey reminders for any newly-created rows — this
- * was previously missing here (present in the main meeting-creation route,
- * but not mirrored here), meaning any exit survey provisioned via backfill
- * silently never got a reminder notification.
+ * Also schedules exit-survey reminders (80% + overdue) for any
+ * newly-created rows — this was previously missing here (present in the
+ * main meeting-creation route, but not mirrored here), meaning any exit
+ * survey provisioned via backfill silently never got either notification.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { meetingId } = await params;
@@ -83,15 +83,30 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
             meetingId,
           });
         } else if (createdSurveyRows && createdSurveyRows.length > 0) {
-          await scheduleExitSurveyReminders(
-            admin,
-            createdSurveyRows.map((row) => ({
-              exitSurveyId: row.id as string,
-              submitterUserId: row.user_id as string,
-              meetingTitle: meeting.title as string,
-            })),
-            { startsAt: meeting.starts_at as string, endsAt: meeting.ends_at as string }
-          );
+          const pendingRows = createdSurveyRows.map((row) => ({
+            exitSurveyId: row.id as string,
+            submitterUserId: row.user_id as string,
+            meetingTitle: meeting.title as string,
+          }));
+
+          await scheduleExitSurveyReminders(admin, pendingRows, {
+            startsAt: meeting.starts_at as string,
+            endsAt: meeting.ends_at as string,
+          });
+
+          // ADDED: mirrors the overdue-scheduling now present in the main
+          // meeting-creation route — see that file's header comment for
+          // why this was flagged as missing here.
+          for (const row of pendingRows) {
+            try {
+              await scheduleExitSurveyOverdueReminder(admin, row, meeting.ends_at as string);
+            } catch (overdueError) {
+              console.error("[backfill-exit-surveys] Failed to schedule overdue exit survey reminder", overdueError, {
+                meetingId,
+                exitSurveyId: row.exitSurveyId,
+              });
+            }
+          }
         }
       }
     }

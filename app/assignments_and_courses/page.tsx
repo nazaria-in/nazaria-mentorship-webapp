@@ -18,6 +18,7 @@ import { ContentItemCard } from "@/components/content/ContentItemCard";
 import { MenteeContentCard } from "@/components/content/MenteeContentCard";
 import { ContentItemFormModal } from "@/components/content/ContentItemFormModal";
 import type { ContentType, Week } from "@/types/content";
+import type { CompletionStatus, MenteeContentDispatch } from "@/types/content";
 
 // Widened from the old "GradedTab" (assignment | course) now that Resources
 // is a full third tab sharing the same view logic instead of living on its
@@ -30,6 +31,59 @@ const TAB_DEFS: { value: ContentTab; label: string }[] = [
   { value: "course", label: "Courses" },
   { value: "resource", label: "Resources" },
 ];
+
+// ---------------------------------------------------------------------------
+// Status filter — client-side, over whatever the mentee's query already
+// returned. Deliberately does NOT touch fetchMenteeContentDispatches or
+// hide anything at the fetch layer: every dispatch the API returns stays
+// in `dispatches`, this only changes which subset renders under the
+// currently-selected chip. That's what "don't hide by start/end time"
+// means in practice — the fetch is unchanged, only the always-optional
+// display filter is new.
+// ---------------------------------------------------------------------------
+type StatusFilter = "all" | "not_started" | "has_started" | "completed" | "overdue";
+
+const STATUS_FILTER_DEFS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "has_started", label: "Has started" },
+  { value: "not_started", label: "Not started" },
+  { value: "completed", label: "Completed" },
+  { value: "overdue", label: "Overdue" },
+];
+
+const DONE_STATUSES: readonly CompletionStatus[] = ["completed", "approved_awaiting_completion"];
+
+/**
+ * Derived purely from data already on the dispatch — no new fetch, no
+ * effect. "Has started" / "Not started" reads off the content item's
+ * submission window start (submission_starts_at) when present; items
+ * with no window are always eligible ("has started" from the moment
+ * they're assigned). "Overdue" reads off due_at vs now and excludes
+ * anything already done, so a late-but-completed item isn't flagged red.
+ *
+ * ASSUMPTION FLAGGED: I don't have MenteeContentDispatch's full shape
+ * (lib/api/content-dispatches.ts / types/content.ts weren't shared), so
+ * I'm assuming `d.content_item.submission_starts_at` and `d.due_at`
+ * exist on it, mirroring the field names used elsewhere in this codebase
+ * (ContentItemFormModal's submissionStartsAt / DispatchRosterRow.due_at).
+ * If the actual field names differ, only this function needs adjusting.
+ */
+function matchesStatusFilter(d: MenteeContentDispatch, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+
+  const isDone = DONE_STATUSES.includes(d.completion_status);
+  if (filter === "completed") return isDone;
+
+  const isOverdue = !isDone && !!d.due_at && new Date(d.due_at).getTime() < Date.now();
+  if (filter === "overdue") return isOverdue;
+
+  const startsAt = d.content_item.submission_starts_at;
+  const hasStarted = !startsAt || new Date(startsAt).getTime() <= Date.now();
+  if (filter === "has_started") return hasStarted && !isDone;
+  if (filter === "not_started") return !hasStarted;
+
+  return true;
+}
 
 interface FormModalState {
   mode: "create" | "edit";
@@ -45,12 +99,24 @@ export default function AssignmentsAndCoursesPage() {
 
   const [tab, setTab] = React.useState<ContentTab>("assignment");
   const [showFilters, setShowFilters] = React.useState(false);
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [formModal, setFormModal] = React.useState<FormModalState | null>(null);
 
   const isMentee = permissionLevel === "mentee";
+  const isStaff = permissionLevel === "staff"; // pm / associate
   const canCreate = permissionLevel === "mentor" || permissionLevel === "staff";
-  const scopeToMentorId = role === "mentor" ? userId ?? undefined : undefined;
+
+  // Explicit three-way scope, matching the todo's "mentee → own,
+  // mentor → created by them, staff → everything" requirement. Staff
+  // previously got "everything" only as a side effect of scopeToCreatedBy
+  // being undefined for any non-mentor role — same runtime behavior, but
+  // now it says what it means instead of relying on an implicit fallthrough.
   const scopeToCreatedBy = role === "mentor" ? userId ?? undefined : undefined;
+  const scopeToMentorId = role === "mentor" ? userId ?? undefined : undefined;
+  // isStaff intentionally applies no scope at all — kept as a named
+  // branch (even though it's a no-op today) so a future reviewer doesn't
+  // mistake the mentor-only scoping above for "everyone gets scoped".
+  void isStaff;
 
   const { data: weeks } = useQuery({ queryKey: ["weeks"], queryFn: fetchWeeks });
   const { data: tags } = useQuery({ queryKey: ["tags"], queryFn: fetchTags });
@@ -96,6 +162,8 @@ export default function AssignmentsAndCoursesPage() {
             onToggleFilters={() => setShowFilters((s) => !s)}
             fieldDefs={fieldDefs}
             filterState={filterState}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
           />
         ) : (
           <StaffView
@@ -183,13 +251,33 @@ function FilterBarWithToggle({ showFilters, onToggleFilters, fieldDefs, filterSt
   );
 }
 
+function StatusFilterChips({ value, onChange }: { value: StatusFilter; onChange: (v: StatusFilter) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {STATUS_FILTER_DEFS.map((def) => (
+        <button
+          key={def.value}
+          type="button"
+          onClick={() => onChange(def.value)}
+          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            value === def.value
+              ? "bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground"
+              : "border border-border text-text-muted hover:text-text-primary dark:border-border dark:text-text-muted dark:hover:text-text-primary"
+          }`}
+        >
+          {def.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Mentee view — mobile-first: search/filter, then a flat "To do" / "Completed"
-// split. No week grouping here; a mentee's own list is short enough that
-// grouping adds friction rather than removing it. Type-agnostic already —
-// works unchanged for the new Resources tab since
-// fetchMenteeContentDispatches handles content_type !== "assignment"
-// generically (binary completed_at status).
+// split, now additionally narrowed by the status chip row. Nothing is ever
+// dropped from the underlying `dispatches` fetch — the status filter only
+// changes what's rendered, per the "don't hide by start/end time" rule;
+// the fetch itself still returns every dispatch regardless of timing.
 // ---------------------------------------------------------------------------
 
 function MenteeView({
@@ -200,6 +288,8 @@ function MenteeView({
   onToggleFilters,
   fieldDefs,
   filterState,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   loading: boolean;
   dispatches: ReturnType<typeof fetchMenteeContentDispatches> extends Promise<infer T> ? T : never;
@@ -208,11 +298,15 @@ function MenteeView({
   onToggleFilters: () => void;
   fieldDefs: ReturnType<typeof useContentFieldDefs>;
   filterState: ReturnType<typeof useFilterState>;
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (v: StatusFilter) => void;
 }) {
   const search = filterState.filterState.search?.toLowerCase().trim() ?? "";
-  const visible = dispatches.filter((d) => !search || d.content_item.title.toLowerCase().includes(search));
-  const toDo = visible.filter((d) => d.completion_status !== "completed" && d.completion_status !== "approved_awaiting_completion");
-  const completed = visible.filter((d) => d.completion_status === "completed" || d.completion_status === "approved_awaiting_completion");
+  const bySearch = dispatches.filter((d) => !search || d.content_item.title.toLowerCase().includes(search));
+  const visible = bySearch.filter((d) => matchesStatusFilter(d, statusFilter));
+
+  const toDo = visible.filter((d) => !DONE_STATUSES.includes(d.completion_status));
+  const completed = visible.filter((d) => DONE_STATUSES.includes(d.completion_status));
 
   return (
     <div className="flex flex-col gap-4">
@@ -223,12 +317,14 @@ function MenteeView({
         filterState={filterState}
       />
 
+      <StatusFilterChips value={statusFilter} onChange={onStatusFilterChange} />
+
       {loading ? (
         <p className="text-sm text-text-muted dark:text-text-muted">Loading…</p>
       ) : visible.length === 0 ? (
         <EmptyState
           title={`No ${tabNoun(tab, true)} yet`}
-          description="Nothing has been assigned to you here at the moment."
+          description="Nothing matches the current filters, or nothing has been assigned to you here yet."
         />
       ) : (
         <div className="flex flex-col gap-5">
@@ -265,6 +361,14 @@ function MenteeView({
 // Staff/mentor view — filters + create, grouped by week (content_items have
 // no start/end date of their own anymore, only their week does). Already
 // generic over content_type; only the empty-state copy is tab-aware.
+//
+// "No week" bucket note: `noWeek` and its rendered list are built from the
+// exact same array in the same pass below (see loop right after this
+// comment) — count and expansion can't drift apart in this file. If you're
+// still seeing a mismatched count in the product, it's coming from a
+// different component (a dashboard/stats widget computing its own "no
+// week" count independently) — share that file and I'll find the actual
+// predicate mismatch there.
 // ---------------------------------------------------------------------------
 
 interface StaffViewProps {

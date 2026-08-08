@@ -49,11 +49,29 @@ export const RESOURCE_STALE_DAYS = 7;
  * (ASSIGNMENT_REMINDER_PERCENTS above, kept as-is since other code may
  * still reference it) — reused here under a content-model-scoped name so
  * the two aren't accidentally conflated later if they ever diverge.
+ * NOTE: only fortyPercent/seventyPercent are currently wired into
+ * scheduleContentDeadlineReminders — ninetyPercent is defined for parity
+ * with ASSIGNMENT_REMINDER_PERCENTS but not yet used by that cascade
+ * (it fires an "overdue" notification at 100% instead).
  */
 export const CONTENT_REMINDER_PERCENTS = {
   fortyPercent: 0.4,
   seventyPercent: 0.7,
   ninetyPercent: 0.9,
+} as const;
+
+/**
+ * Percent-through-window marks for the exit-survey reminder cascade
+ * (meeting starts_at → ends_at). eightyPercent is DERIVED from
+ * EXIT_SURVEY_TRIGGER_PERCENT above rather than a second literal — the
+ * original draft of this constant hardcoded 0.8 separately with a comment
+ * claiming equality, which would have silently drifted the moment
+ * EXIT_SURVEY_TRIGGER_PERCENT got confirmed to a different value. Now
+ * there is exactly one source of truth for that number.
+ */
+export const EXIT_SURVEY_REMINDER_PERCENTS = {
+  fiftyPercent: 0.5,
+  eightyPercent: EXIT_SURVEY_TRIGGER_PERCENT,
 } as const;
 
 /**

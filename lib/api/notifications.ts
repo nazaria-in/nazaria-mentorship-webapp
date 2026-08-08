@@ -163,6 +163,9 @@ export async function markNotificationRead(
  */
 export async function markAllNotificationsRead(userId: string, scopedNotificationIds?: string[]): Promise<void>;
 export async function markAllNotificationsRead(supabase: NotificationsClient, userId: string, scopedNotificationIds?: string[]): Promise<void>;
+// markAllNotificationsRead — now scopes to what's actually visible, so a
+// future-dated reminder can never be marked read before the user could
+// have seen it.
 export async function markAllNotificationsRead(
   clientOrUserId: NotificationsClient | string,
   maybeUserIdOrScopedIds?: string | string[],
@@ -170,25 +173,30 @@ export async function markAllNotificationsRead(
 ): Promise<void> {
   const { client, isClientPassed } = resolveClient(clientOrUserId);
   const userId = isClientPassed ? (maybeUserIdOrScopedIds as string) : (clientOrUserId as string);
-  const scopedNotificationIds = isClientPassed
-    ? maybeScopedIds
-    : (maybeUserIdOrScopedIds as string[] | undefined);
+  const scopedNotificationIds = isClientPassed ? maybeScopedIds : (maybeUserIdOrScopedIds as string[] | undefined);
 
-  let query = client
-    .from("user_notifications")
-    .update({ read_at: new Date().toISOString() })
+  let visibleQuery = client
+    .from("v_visible_user_notifications")
+    .select("user_notification_id")
     .eq("user_id", userId)
-    .is("read_at", null)
-    .is("deleted_at", null);
+    .is("read_at", null);
 
   if (scopedNotificationIds && scopedNotificationIds.length > 0) {
-    query = query.in("notification_id", scopedNotificationIds);
+    visibleQuery = visibleQuery.in("id", scopedNotificationIds);
   }
 
-  const { error } = await query;
+  const { data: visibleRows, error: visError } = await visibleQuery;
+  if (visError) throw visError;
+
+  const ids = (visibleRows ?? []).map((r) => r.user_notification_id as string);
+  if (ids.length === 0) return;
+
+  const { error } = await client
+    .from("user_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .in("id", ids);
   if (error) throw error;
 }
-
 export interface FetchNotificationsParams {
   userId: string;
   onlyUnread?: boolean;
@@ -213,10 +221,9 @@ export async function fetchNotificationsForUser(
   const params = isClientPassed ? maybeParams! : (clientOrParams as FetchNotificationsParams);
 
   let query = client
-    .from("user_notifications")
-    .select("id, read_at, notification:notifications(*)")
+    .from("v_visible_user_notifications")
+    .select("*")
     .eq("user_id", params.userId)
-    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 20);
 
@@ -226,20 +233,20 @@ export async function fetchNotificationsForUser(
   const { data, error } = await query;
   if (error) throw error;
 
-  type Row = { id: string; read_at: string | null; notification: NotificationWithDelivery | null };
+  const rows = (data ?? []) as Array<NotificationWithDelivery & {
+    user_notification_id: string;
+    read_at: string | null;
+  }>;
 
-  const rows = ((data ?? []) as unknown as Row[]).filter((row) => row.notification !== null);
+  const filtered = params.types ? rows.filter((r) => params.types!.includes(r.type)) : rows;
 
-  const filtered = params.types
-    ? rows.filter((row) => params.types!.includes(row.notification!.type))
-    : rows;
-
-  return filtered.map((row) => ({
-    ...(row.notification as NotificationWithDelivery),
-    userNotificationId: row.id,
-    readAt: row.read_at,
+  return filtered.map((r) => ({
+    ...r,
+    userNotificationId: r.user_notification_id,
+    readAt: r.read_at,
   }));
 }
+
 
 export async function fetchUnreadNotificationCount(userId: string): Promise<number>;
 export async function fetchUnreadNotificationCount(supabase: NotificationsClient, userId: string): Promise<number>;
@@ -251,11 +258,10 @@ export async function fetchUnreadNotificationCount(
   const userId = isClientPassed ? maybeUserId! : (clientOrUserId as string);
 
   const { count, error } = await client
-    .from("user_notifications")
-    .select("id", { count: "exact", head: true })
+    .from("v_visible_user_notifications")
+    .select("user_notification_id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .is("read_at", null)
-    .is("deleted_at", null);
+    .is("read_at", null);
 
   if (error) throw error;
   return count ?? 0;
