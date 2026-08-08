@@ -23,7 +23,7 @@ export interface UserCardProps {
    * the viewer's permission level + this person's role.
    */
   clickable: boolean;
-  /** One action element: approve/reject buttons, a role dropdown, a pod
+  /** One action element: approve/reject buttons, a role dropdown, a team
    *  dropdown, a remove button — whatever the calling context needs.
    *  Ignored when `onToggleSelect` is set — picker mode owns the action
    *  slot for its own remove-committed button instead (see PeopleGrid). */

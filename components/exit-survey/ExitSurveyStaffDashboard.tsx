@@ -79,7 +79,7 @@ export function ExitSurveyStaffDashboard() {
             onChange={(e) => setPodFilter(e.target.value)}
             className="rounded-lg border border-border bg-card-alt px-3 py-1.5 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
           >
-            <option value="">All pods</option>
+            <option value="">All teams</option>
             {(podOptions ?? []).map((pod) => (
               <option key={pod.value} value={pod.value}>
                 {pod.label}

@@ -255,8 +255,8 @@ export async function createConversation(input: CreateConversationInput): Promis
   if (userError) throw userError;
   if (!userData.user) throw new Error("Not authenticated.");
 
-  if (input.kind === "pod" && !input.podId) {
-    throw new Error("podId is required for pod conversations.");
+  if (input.kind === "team" && !input.podId) {
+    throw new Error("teamId is required for team conversations.");
   }
   if (input.kind === "broadcast" && (!input.cohortId || !input.audience)) {
     throw new Error("cohortId and audience are required for broadcast conversations.");
@@ -270,7 +270,7 @@ export async function createConversation(input: CreateConversationInput): Promis
     created_by: userData.user.id,
     name: input.name.trim() || null,
     description: input.description?.trim() || null,
-    pod_id: input.kind === "pod" ? input.podId : null,
+    pod_id: input.kind === "team" ? input.podId : null,
     cohort_id: input.kind === "broadcast" ? input.cohortId : null,
     audience: input.kind === "broadcast" ? input.audience : null,
   };

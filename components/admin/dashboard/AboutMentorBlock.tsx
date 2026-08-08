@@ -34,8 +34,8 @@ export function AboutMentorBlock({ scope }: { scope: AdminScope }) {
     <div className="flex bg-gray-100 p-4 rounded-xl  flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
-          <p className="text-xs text-text-muted dark:text-text-muted">Pod</p>
-          <p className="text-sm font-medium text-text-primary dark:text-text-primary">{data.podName ?? "No pod"}</p>
+          <p className="text-xs text-text-muted dark:text-text-muted">Team</p>
+          <p className="text-sm font-medium text-text-primary dark:text-text-primary">{data.podName ?? "No Team"}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
           <p className="text-xs text-text-muted dark:text-text-muted">Mentees&apos; completion</p>
@@ -88,7 +88,7 @@ export function AboutMentorBlock({ scope }: { scope: AdminScope }) {
             return term ? data.mentees.filter((m) => (m.fullName ?? "").toLowerCase().includes(term)) : data.mentees;
           }}
           computeClickable={() => true}
-          emptyMessage="No mentees in this pod."
+          emptyMessage="No mentees in this Team."
         />
       </div>
     </div>

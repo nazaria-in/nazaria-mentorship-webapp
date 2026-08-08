@@ -3,11 +3,10 @@
 "use client";
 
 import * as React from "react";
-import { useSessionStore } from "@/store/session-store";
+import { useSessionStore, type ApprovalStatus } from "@/store/session-store";
 
 export type Role = "mentee" | "mentor" | "associate" | "pm";
 
-// All possible roles in the system
 export const ALL_ROLES: Role[] = ["mentee", "mentor", "associate", "pm"];
 
 export type PermissionLevel = "mentee" | "mentor" | "staff";
@@ -26,52 +25,56 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 interface RoleContextValue {
-  role: Role;
+  role: Role | null;
   permissionLevel: PermissionLevel;
   setRole: (role: Role) => void;
   canSwitchRole: boolean;
   availableRoles: Role[];
   isDebug: boolean;
+  approvalStatus?: ApprovalStatus | null;
+  isAuthenticated: boolean;
 }
 
 const RoleContext = React.createContext<RoleContextValue | null>(null);
 
 export interface RoleProviderProps {
   children: React.ReactNode;
-  /** Roles this signed-in user is actually allowed to preview as.
-   * Defaults to just their real role — pass more only for staff/dev. */
   availableRoles?: Role[];
-  /** Bypasses session requirements and opens up all roles for debugging/development */
   isDebug?: boolean;
 }
 
 export function RoleProvider({ children, availableRoles, isDebug = false }: RoleProviderProps) {
-  // Gracefully fetch session role if available
   const sessionRole = useSessionStore((s) => s.role) as Role | undefined;
+  const userId = useSessionStore((s) => s.userId);
+  const approvalStatus = useSessionStore((s) => s.approvalStatus);
+
   const [override, setOverride] = React.useState<Role | null>(null);
 
-  // Compute available roles based on debug mode vs active session
+  // Strict check for active session
+  const isAuthenticated = isDebug || Boolean(userId && sessionRole);
+
   const roles = React.useMemo(() => {
     if (isDebug) return ALL_ROLES;
     if (availableRoles) return availableRoles;
     return sessionRole ? [sessionRole] : [];
   }, [availableRoles, sessionRole, isDebug]);
 
-  // Determine current active role fallback logic
-  const role = React.useMemo(() => {
+  const activeRole: Role | null = React.useMemo(() => {
     if (override && roles.includes(override)) return override;
     if (sessionRole && roles.includes(sessionRole)) return sessionRole;
-    // Fallback if not logged in but in debug mode
-    return roles[0] ?? "mentee";
-  }, [override, sessionRole, roles]);
+    if (isDebug) return roles[0] ?? "mentee";
+    return null;
+  }, [override, sessionRole, roles, isDebug]);
 
   const value: RoleContextValue = {
-    role,
-    permissionLevel: permissionLevelFor(role),
+    role: activeRole,
+    permissionLevel: permissionLevelFor(activeRole ?? "mentee"),
     setRole: setOverride,
     canSwitchRole: roles.length > 1,
     availableRoles: roles,
     isDebug,
+    approvalStatus,
+    isAuthenticated,
   };
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
@@ -80,5 +83,15 @@ export function RoleProvider({ children, availableRoles, isDebug = false }: Role
 export function useRole(): RoleContextValue {
   const ctx = React.useContext(RoleContext);
   if (!ctx) throw new Error("useRole must be used within a RoleProvider");
+
+  // Debug log to inspect what context values are active
+  console.log("[useRole Context Check]:", {
+    role: ctx.role,
+    permissionLevel: ctx.permissionLevel,
+    isAuthenticated: ctx.isAuthenticated,
+    isDebug: ctx.isDebug,
+    approvalStatus: ctx.approvalStatus,
+  });
+
   return ctx;
 }

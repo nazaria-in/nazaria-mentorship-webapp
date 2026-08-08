@@ -18,7 +18,7 @@ interface MessageListProps {
   currentUserId: string;
   isStaffViewer: boolean;
   /** Direct 1:1s never need sender labels; anything with more than 2 people does. */
-  conversationKind: "direct" | "pod" | "group" | "broadcast";
+  conversationKind: "direct" | "team" | "group" | "broadcast";
   /** last_read_at captured once on mount — the unread divider position must not shift as you read further. */
   initialLastReadAt: string | null;
   hasNextPage: boolean;

@@ -75,7 +75,7 @@ export function RoleChoice() {
         <RoleCard
           icon={<Users className="h-5 w-5" />}
           title="I want to mentor"
-          description="Apply to guide a pod. Requires PM approval before you get access."
+          description="Apply to guide a team. Requires PM approval before you get access."
           active={selected === "mentor"}
           onClick={() => setSelected("mentor")}
         />

@@ -93,7 +93,7 @@ export function AddParticipantModal({
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
               defaultView="list"
-              emptyMessage="Everyone in this pod is already here."
+              emptyMessage="Everyone in this team is already here."
             />
           ) : (
             <PeopleGrid

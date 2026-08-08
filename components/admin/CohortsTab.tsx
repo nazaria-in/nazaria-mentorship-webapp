@@ -22,17 +22,17 @@ import type { UserCardPerson } from "@/components/shared/UserCard";
 type Crumb =
   | { level: "root" }
   | { level: "cohort"; id: string; name: string }
-  | { level: "pod"; cohortId: string; cohortName: string; id: string; name: string };
+  | { level: "team"; cohortId: string; cohortName: string; id: string; name: string };
 
 function Breadcrumbs({ crumb, onNavigate }: { crumb: Crumb; onNavigate: (c: Crumb) => void }) {
   const parts: { label: string; target: Crumb }[] = [{ label: "All cohorts", target: { level: "root" } }];
-  if (crumb.level === "cohort" || crumb.level === "pod") {
+  if (crumb.level === "cohort" || crumb.level === "team") {
     parts.push({
       label: crumb.level === "cohort" ? crumb.name : crumb.cohortName,
       target: crumb.level === "cohort" ? crumb : { level: "cohort", id: crumb.cohortId, name: crumb.cohortName },
     });
   }
-  if (crumb.level === "pod") parts.push({ label: crumb.name, target: crumb });
+  if (crumb.level === "team") parts.push({ label: crumb.name, target: crumb });
 
   return (
     <nav className="flex items-center gap-1.5 text-sm">
@@ -114,7 +114,7 @@ function AddPodForm({ cohortId, onCreated }: { cohortId: string; onCreated: () =
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Pod name"
+        placeholder="Team name"
         autoFocus
         className="rounded-lg border border-border bg-card-alt px-3 py-1.5 text-sm text-text-primary dark:border-border dark:bg-card-alt dark:text-text-primary"
       />
@@ -145,9 +145,9 @@ function PodList({ cohortId, onSelect }: { cohortId: string; onSelect: (pod: Pod
         cohortId={cohortId}
         onCreated={() => queryClient.invalidateQueries({ queryKey: ["pods-for-cohort", cohortId] })}
       />
-      {isLoading && <p className="text-sm text-text-muted dark:text-text-muted">Loading pods…</p>}
+      {isLoading && <p className="text-sm text-text-muted dark:text-text-muted">Loading teams…</p>}
       {!isLoading && (!data || data.length === 0) && (
-        <p className="text-sm text-text-muted dark:text-text-muted">No pods in this cohort yet.</p>
+        <p className="text-sm text-text-muted dark:text-text-muted">No teams in this cohort yet.</p>
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         {(data ?? []).map((pod) => (
@@ -204,7 +204,7 @@ function AddMemberPanel({ podId, onAdded }: { podId: string; onAdded: () => void
           Add
         </button>
       )}
-      emptyMessage="Everyone matching these filters is already in this pod."
+      emptyMessage="Everyone matching these filters is already in this team."
       defaultView="list"
     />
   );
@@ -319,12 +319,12 @@ export function CohortsTab() {
         <PodList
           cohortId={crumb.id}
           onSelect={(pod) =>
-            setCrumb({ level: "pod", cohortId: crumb.id, cohortName: crumb.name, id: pod.id, name: pod.name })
+            setCrumb({ level: "team", cohortId: crumb.id, cohortName: crumb.name, id: pod.id, name: pod.name })
           }
         />
       )}
 
-      {crumb.level === "pod" && (
+      {crumb.level === "team" && (
         <PodRosterView podId={crumb.id} cohortName={crumb.cohortName} podName={crumb.name} />
       )}
 

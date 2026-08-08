@@ -1,6 +1,6 @@
 // /types/messages.ts
 
-export type ConversationKind = "direct" | "pod" | "group" | "broadcast";
+export type ConversationKind = "direct" | "team" | "group" | "broadcast";
 
 export type BroadcastAudience = string;
 
@@ -90,7 +90,7 @@ export interface PendingMessage extends Message {
   status: PendingMessageStatus;
 }
 
-export type ConversationListFilter = "all" | "unread" | "pods" | "groups" | "broadcasts" | "direct";
+export type ConversationListFilter = "all" | "unread" | "teams" | "groups" | "broadcasts" | "direct";
 
 export interface ComposerDisabledState {
   disabled: boolean;

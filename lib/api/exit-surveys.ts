@@ -227,7 +227,7 @@ async function mergeContext(rows: ExitSurveyDetail[]): Promise<ExitSurveyDetail[
   if (error) {
     // Context is supplementary — don't fail the whole fetch if this lookup
     // errors, just leave pod/mentor fields null.
-    console.error("[exit-surveys] Failed to load pod/mentor context:", error.message);
+    console.error("[exit-surveys] Failed to load team/mentor context:", error.message);
     return rows;
   }
 

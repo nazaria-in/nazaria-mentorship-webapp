@@ -79,8 +79,8 @@ const AUDIENCE_COPY: Record<Audience, AudienceCopy> = {
       },
       {
         icon: <Users className="h-5 w-5" aria-hidden="true" />,
-        title: "A pod that has your back",
-        body: "You're never learning alone — your pod, your mentor, and the Nazaria team are one message away.",
+        title: "A team that has your back",
+        body: "You're never learning alone — your team, your mentor, and the Nazaria team are one message away.",
       },
     ],
   },
@@ -115,8 +115,8 @@ const AUDIENCE_COPY: Record<Audience, AudienceCopy> = {
 const HOW_IT_WORKS: { step: string; title: string; body: string }[] = [
   {
     step: "01",
-    title: "Get matched to a pod",
-    body: "Every mentee joins a small pod with a dedicated mentor for the length of the cohort.",
+    title: "Get matched to a team",
+    body: "Every mentee joins a small team with a dedicated mentor for the length of the cohort.",
   },
   {
     step: "02",

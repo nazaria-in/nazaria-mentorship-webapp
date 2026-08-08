@@ -15,7 +15,7 @@ export async function getPodStats(scope?: AdminScope | null): Promise<PodStats[]
   if (scope && scope.podId) {
     rows = rows.filter((r) => r.pod_id === scope.podId);
   } else if (scope && (scope.role === "mentor" || scope.role === "mentee") && !scope.podId) {
-    rows = []; // scoped to a person with no pod — nothing to show, not everything
+    rows = []; // scoped to a person with no team — nothing to show, not everything
   }
 
   return rows;

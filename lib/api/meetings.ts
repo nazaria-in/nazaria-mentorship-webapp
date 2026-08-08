@@ -209,7 +209,7 @@ export async function respondToMeetingInvite(
 
 /**
  * Invite candidates for the creation form.
- * - mentor/mentee: every member (mentor + mentee) of the requester's own pod(s).
+ * - mentor/mentee: every member (mentor + mentee) of the requester's own team(s).
  * - pm/associate: every approved user.
  * Self is always excluded.
  */
@@ -237,7 +237,7 @@ export async function fetchInviteCandidates(
     }));
   }
 
-  // mentor or mentee: merge both roles across the requester's own pod(s)
+  // mentor or mentee: merge both roles across the requester's own team(s)
   const [mentorGroups, menteeGroups] = await Promise.all([
     fetchPodMemberGroups({ role: "mentor", mentorId: requesterId, includeEmptyPods: true }),
     fetchPodMemberGroups({ role: "mentee", mentorId: requesterId, includeEmptyPods: true }),

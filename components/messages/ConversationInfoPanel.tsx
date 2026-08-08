@@ -37,7 +37,7 @@ interface ConversationInfoPanelProps {
 function KindIcon({ kind }: { kind: ConversationKind }) {
   const className = "h-5 w-5 text-text-muted dark:text-text-muted";
   if (kind === "broadcast") return <Megaphone className={className} />;
-  if (kind === "pod") return <Users className={className} />;
+  if (kind === "team") return <Users className={className} />;
   if (kind === "group") return <UsersRound className={className} />;
   return <User className={className} />;
 }
@@ -69,13 +69,13 @@ export function ConversationInfoPanel({
   const showLeaveOption = canLeave && kind !== "broadcast";
 
   // Staff can add/remove anyone. Mentors can add/remove mentee/mentor within
-  // their own pod conversations only. Mentees never see these controls.
-  const canManageParticipants = isStaff || (isMentor && kind === "pod");
+  // their own team conversations only. Mentees never see these controls.
+  const canManageParticipants = isStaff || (isMentor && kind === "team");
 
   function canRemoveThisParticipant(participant: ParticipantWithProfile): boolean {
     if (participant.user_id === currentUserId) return false;
     if (isStaff) return true;
-    if (isMentor && kind === "pod" && podId) {
+    if (isMentor && kind === "team" && podId) {
       return participant.role === "mentee" || participant.role === "mentor";
     }
     return false;

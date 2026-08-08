@@ -15,7 +15,7 @@ export interface RelationPickerProps {
 // Visually identical to EntityPicker — kept as a separate component because
 // the two kinds resolve to different query clauses in apply-filters.ts
 // (.eq() on the row itself vs .eq() on an embedded relation). If you ever
-// need relation-specific UI (e.g. showing pod member count), change it here
+// need relation-specific UI (e.g. showing team member count), change it here
 // without touching EntityPicker's simpler direct-FK case.
 export function RelationPicker(props: RelationPickerProps) {
   return <EntityPicker {...props} />;

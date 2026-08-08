@@ -62,7 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq("user_id", authUser.id);
 
     if (myPodError) {
-      return NextResponse.json({ error: "Could not verify pod membership" }, { status: 400 });
+      return NextResponse.json({ error: "Could not verify team membership" }, { status: 400 });
     }
 
     const myPodIds = (myPodRows ?? []).map((r) => r.pod_id as string);
@@ -73,14 +73,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .in("pod_id", myPodIds);
 
     if (allowedError) {
-      return NextResponse.json({ error: "Could not verify pod members" }, { status: 400 });
+      return NextResponse.json({ error: "Could not verify team members" }, { status: 400 });
     }
 
     const allowedIds = new Set((allowedRows ?? []).map((r) => r.user_id as string));
     const invalid = participantIds.filter((id) => !allowedIds.has(id));
 
     if (invalid.length > 0) {
-      return NextResponse.json({ error: "You can only invite members of your own pod" }, { status: 403 });
+      return NextResponse.json({ error: "You can only invite members of your own team" }, { status: 403 });
     }
   }
 

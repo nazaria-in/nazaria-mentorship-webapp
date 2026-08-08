@@ -74,10 +74,10 @@ export async function POST(req: NextRequest) {
       if (assignmentRes.error || !assignmentRes.data) throw new Error("Assignment not found");
       if (menteeRes.error || !menteeRes.data) throw new Error("Mentee not found");
       if (podRes.error || !podRes.data?.pod) {
-        throw new Error("Mentee isn't assigned to a pod yet — can't resolve Drive folder path");
+        throw new Error("Mentee isn't assigned to a team yet — can't resolve Drive folder path");
       }
       const pod = podRes.data.pod;
-      if (!pod.cohort) throw new Error("Pod has no cohort — can't resolve Drive folder path");
+      if (!pod.cohort) throw new Error("Team has no cohort — can't resolve Drive folder path");
 
       folderId = await resolveAssignmentMenteeFolder({
         cohortName: pod.cohort.name,
@@ -110,10 +110,10 @@ export async function POST(req: NextRequest) {
       if (resourceRes.error || !resourceRes.data) throw new Error("Resource not found");
       if (menteeRes.error || !menteeRes.data) throw new Error("Mentee not found");
       if (podRes.error || !podRes.data?.pod) {
-        throw new Error("Mentee isn't assigned to a pod yet — can't resolve Drive folder path");
+        throw new Error("Mentee isn't assigned to a team yet — can't resolve Drive folder path");
       }
       const pod = podRes.data.pod;
-      if (!pod.cohort) throw new Error("Pod has no cohort — can't resolve Drive folder path");
+      if (!pod.cohort) throw new Error("Team has no cohort — can't resolve Drive folder path");
 
       folderId = await resolveResourceMenteeFolder({
         cohortName: pod.cohort.name,

@@ -14,7 +14,7 @@ interface ConversationListItemProps {
 function KindIcon({ kind }: { kind: ConversationKind }) {
   const className = "h-4 w-4 shrink-0 text-text-muted dark:text-text-muted";
   if (kind === "broadcast") return <Megaphone className={className} />;
-  if (kind === "pod") return <Users className={className} />;
+  if (kind === "team") return <Users className={className} />;
   if (kind === "group") return <UsersRound className={className} />;
   return <User className={className} />;
 }

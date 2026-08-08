@@ -36,7 +36,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
   const isMentor = role === "mentor";
 
   // Mentor can only ever create 'pod' conversations. Staff choose freely.
-  const [kind, setKind] = useState<ConversationKind>(isMentor ? "pod" : "group");
+  const [kind, setKind] = useState<ConversationKind>(isMentor ? "team" : "group");
   const [selectedPodId, setSelectedPodId] = useState<string | null>(null);
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
   const [audience, setAudience] = useState<string>("");
@@ -74,7 +74,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
     }));
   }, [selectedPodId, mentorPodGroups]);
 
-  const podLocked = isMentor && kind === "pod" && !selectedPodId;
+  const podLocked = isMentor && kind === "team" && !selectedPodId;
   const isBroadcast = kind === "broadcast";
 
   function displayNameFor(id: string): string {
@@ -85,7 +85,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
   }
 
   function resetAndClose() {
-    setKind(isMentor ? "pod" : "group");
+    setKind(isMentor ? "team" : "group");
     setSelectedPodId(null);
     setSelectedCohortId(null);
     setAudience("");
@@ -121,7 +121,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
         name: name.trim(),
         description: description.trim() || undefined,
         kind,
-        podId: kind === "pod" ? selectedPodId ?? undefined : undefined,
+        podId: kind === "team" ? selectedPodId ?? undefined : undefined,
         cohortId: isBroadcast ? selectedCohortId ?? undefined : undefined,
         audience: isBroadcast ? audience : undefined,
         participants: isBroadcast
@@ -141,11 +141,11 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
   }
 
   const kindOptions: { value: ConversationKind; label: string }[] = isMentor
-    ? [{ value: "pod", label: "Pod" }]
+    ? [{ value: "team", label: "Team" }]
     : [
         { value: "group", label: "Group" },
         { value: "direct", label: "Direct message" },
-        { value: "pod", label: "Pod" },
+        { value: "team", label: "Team" },
         { value: "broadcast", label: "Broadcast" },
       ];
 
@@ -191,7 +191,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
           </div>
         )}
 
-        {(kind === "pod" || kind === "group") && (
+        {(kind === "team" || kind === "group") && (
           <div>
             <label className="text-sm font-medium text-text-primary dark:text-text-primary">
               Description <span className="text-text-muted dark:text-text-muted font-normal">(optional)</span>
@@ -206,11 +206,11 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
           </div>
         )}
 
-        {isMentor && kind === "pod" && (
+        {isMentor && kind === "team" && (
           <div>
-            <label className="text-sm font-medium text-text-primary dark:text-text-primary">Pod</label>
+            <label className="text-sm font-medium text-text-primary dark:text-text-primary">Team</label>
             <p className="text-xs text-text-muted dark:text-text-muted mb-1">
-              You can only message mentees from one pod per conversation.
+              You can only message mentees from one team per conversation.
             </p>
             <select
               value={selectedPodId ?? ""}
@@ -277,7 +277,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
                 selectedIds={selectedIds}
                 onSelectionChange={setSelectedIds}
                 defaultView="list"
-                emptyMessage="No mentees in this pod."
+                emptyMessage="No mentees in this Team."
               />
             ) : (
               <PeopleGrid

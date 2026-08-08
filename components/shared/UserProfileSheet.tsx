@@ -359,10 +359,10 @@ export function UserProfileSheet() {
           </Section>
         )}
 
-        <Section title="Pods">
+        <Section title="Teams">
           {pods.isLoading && <p className="text-sm text-text-muted">Loading…</p>}
           {pods.data?.length === 0 && (
-            <p className="text-sm text-text-muted">Not on a pod yet.</p>
+            <p className="text-sm text-text-muted">Not on a team yet.</p>
           )}
           <div className="space-y-2">
             {pods.data?.map((p) => <Row key={p.pod_id}>{p.pod_name}</Row>)}

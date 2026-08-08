@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const FILTERS: { key: ConversationListFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
-  { key: "pods", label: "Pods" },
+  { key: "teams", label: "teams" },
   { key: "groups", label: "Groups" },
   { key: "broadcasts", label: "Broadcasts" },
   { key: "direct", label: "Direct" },
@@ -37,8 +37,8 @@ function matchesFilter(conversation: ConversationSummary, filter: ConversationLi
   switch (filter) {
     case "unread":
       return conversation.unread_count > 0;
-    case "pods":
-      return conversation.kind === "pod";
+    case "teams":
+      return conversation.kind === "team";
     case "groups":
       return conversation.kind === "group";
     case "broadcasts":

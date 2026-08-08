@@ -100,7 +100,7 @@ export function AdminDashboardContent() {
     .filter((id): id is string => id !== null);
   const subjects = useEscalationSubjects(subjectIds);
 
-  // Pod/mentor comparison tables only make sense unscoped — a single
+  // team/mentor comparison tables only make sense unscoped — a single
   // mentee/mentor gets AboutMenteeBlock/AboutMentorBlock instead (plan §3
   // B/C). Only fetch these when there's something to show.
   const podStats = useQuery({
@@ -164,7 +164,7 @@ export function AdminDashboardContent() {
           : "—",
     },
     {
-      label: "Pods below 50% Completion",
+      label: "Teams below 50% Completion",
       value: String(
         (podStats.data ?? []).filter(
           (p) => p.total_assignments > 0 && p.completed_assignments / p.total_assignments < 0.5
@@ -219,7 +219,7 @@ export function AdminDashboardContent() {
         <>
           <section>
             <h2 className="font-heading text-lg font-semibold text-text-primary mb-3 dark:text-text-primary">
-              Pods at a glance
+              Teamss at a glance
             </h2>
             <PodCompletionSection data={podStats.data ?? []} isLoading={podStats.isLoading} />
           </section>

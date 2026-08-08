@@ -470,7 +470,7 @@ export function ContentItemFormModal({
                 fetchSelectablePeople({ role: "mentee", mentorId: scopeToMentorId }, filterState.search)
               }
               groupBy="pod"
-              groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No pod"}
+              groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No team"}
               selectable
               selectedIds={selectedMenteeIds}
               onSelectionChange={setSelectedMenteeIds}
@@ -482,7 +482,7 @@ export function ContentItemFormModal({
                   names.length > 1 ? "them" : "this mentee"
                 }? This can't be undone.`
               }
-              emptyMessage="No pods with mentees found."
+              emptyMessage="No teams with mentees found."
             />
           )}
 

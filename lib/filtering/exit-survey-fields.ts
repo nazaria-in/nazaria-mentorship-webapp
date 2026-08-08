@@ -2,9 +2,9 @@
 
 import type { FilterFieldDef } from "@/lib/filtering/types";
 
-// concern_tags (text[]) and pod (view-joined, no direct column) aren't
+// concern_tags (text[]) and team (view-joined, no direct column) aren't
 // included here — no FilterFieldDef kind maps cleanly onto either without
-// a computed resolver. Pod gets its own dropdown outside SmartFilterBar in
+// a computed resolver. team gets its own dropdown outside SmartFilterBar in
 // ExitSurveyStaffDashboard; concern tags remain read-only badges only. See
 // docs/EXIT_SURVEY_SYSTEM.md "Known gaps."
 export const EXIT_SURVEY_STAFF_FIELD_DEFS: FilterFieldDef[] = [

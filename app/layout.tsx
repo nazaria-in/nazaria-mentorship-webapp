@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProvider>
             <SessionProvider>
-              <RoleProvider isDebug={true}>
+              <RoleProvider isDebug={false}>
                 <ConditionalShell>{children}</ConditionalShell>
               </RoleProvider>
             </SessionProvider>

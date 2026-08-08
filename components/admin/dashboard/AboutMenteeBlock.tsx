@@ -33,8 +33,8 @@ export function AboutMenteeBlock({ scope }: { scope: AdminScope }) {
   return (
     <div className="grid gap-3 bg-gray-100 p-4 rounded-xl sm:grid-cols-2">
       <div className="rounded-xl border border-border bg-card p-4 dark:border-border dark:bg-card">
-        <p className="text-xs text-text-muted dark:text-text-muted">Pod</p>
-        <p className="text-sm font-medium text-text-primary dark:text-text-primary">{data.podName ?? "No pod"}</p>
+        <p className="text-xs text-text-muted dark:text-text-muted">Team</p>
+        <p className="text-sm font-medium text-text-primary dark:text-text-primary">{data.podName ?? "No Team"}</p>
         {data.mentorNames.length > 0 && (
           <p className="mt-1 text-xs text-text-muted dark:text-text-muted">
             Mentor{data.mentorNames.length > 1 ? "s" : ""}: {data.mentorNames.join(", ")}
