@@ -181,7 +181,15 @@ export async function requestPasswordReset(email: string): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/reset-password`,
   });
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    if (error.status === 429 || /rate limit/i.test(error.message)) {
+      throw new Error(
+        "We've hit our email limit for the moment. Please try again after 1 hour."
+      );
+    }
+    throw new Error(error.message);
+  }
 }
 
 export async function updatePassword(newPassword: string): Promise<void> {
