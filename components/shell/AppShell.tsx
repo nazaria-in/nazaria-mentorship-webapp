@@ -9,13 +9,12 @@ import type { LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, MoreHorizontal, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
 import { PageDescriptionShell } from "@/components/shell/PageDescriptionShell";
 import { useRole } from "@/providers/role-provider";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useSessionStore } from "@/store/session-store";
 
-export interface NavItem {
+export interface NavItem {   
   id: string;
   label: string;
   href: string;
