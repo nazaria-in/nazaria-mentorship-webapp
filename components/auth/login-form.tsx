@@ -77,6 +77,13 @@ export function LoginForm() {
             placeholder="••••••••"
             required
           />
+          <Link
+              href="/auth/forgot-password"
+              className="text-sm font-medium text-text-accent hover:underline"
+            >
+              Forgot password?
+          </Link>
+
         </div>
       </div>
 

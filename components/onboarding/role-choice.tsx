@@ -1,9 +1,8 @@
-// /components/onboarding/role-choice.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { GraduationCap, ShieldCheck, Users } from "lucide-react";
+import { useEffect, useRef, useState, startTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { GraduationCap, Loader2, ShieldCheck, Users } from "lucide-react";
 
 import { setUserRole } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
@@ -11,61 +10,121 @@ import { cn } from "@/lib/utils";
 
 import type { UserRole } from "@/types/users";
 
-// Roles that require PM approval before the user gets product access.
-// Both mentor and associate applications are reviewed manually — only
-// mentee signups skip straight to profile setup.
 const ROLES_REQUIRING_APPROVAL: readonly UserRole[] = ["mentor", "associate"];
+const VALID_ROLES: readonly UserRole[] = ["mentee", "mentor", "associate"];
+
+const SESSION_RETRY_INTERVAL_MS = 500;
+const SESSION_RETRY_MAX_ATTEMPTS = 10;
+const ROLE_PARAM = "role";
+
+function parseRoleParam(value: string | null): UserRole | null {
+  if (!value) return null;
+  return (VALID_ROLES as readonly string[]).includes(value) ? (value as UserRole) : null;
+}
 
 export interface RoleChoiceProps {
-  /**
-   * True while the session is still being resolved (see
-   * SessionLoadingGate). Greys out the role cards and blocks selection —
-   * on top of the existing hydrated-gated submit button — so the whole
-   * control reads as inert, not just the button at the bottom.
-   */
   disabled?: boolean;
 }
 
 export function RoleChoice({ disabled = false }: RoleChoiceProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const roleFromUrl = parseRoleParam(searchParams.get(ROLE_PARAM));
+
   const userId = useSessionStore((s) => s.userId);
   const hydrated = useSessionStore((s) => s.hydrated);
-  const [selected, setSelected] = useState<UserRole | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const setRole = useSessionStore((s) => s.setRole);
 
-  async function handleContinue() {
-    if (!selected) return;
+  // Fixed TypeScript error: using typeof roleFromUrl or explicit UserRole union type
+  const [selected, setSelected] = useState<UserRole | null>(roleFromUrl);
+  const [submitting, setSubmitting] = useState(false);
+  const [waitingForSession, setWaitingForSession] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [resumed, setResumed] = useState(false);
+  const retryTokenRef = useRef(0);
 
-    if (!userId) {
-      setError(
-        "We couldn't find your session yet. Wait a moment and try again, or refresh the page."
-      );
-      return;
-    }
-
+  async function saveRole(uid: string, role: UserRole) {
     setSubmitting(true);
     setError(null);
-
     try {
-      await setUserRole(userId, selected);
-      setRole(selected);
-
+      await setUserRole(uid, role);
+      setRole(role);
       router.push(
-        ROLES_REQUIRING_APPROVAL.includes(selected)
+        ROLES_REQUIRING_APPROVAL.includes(role)
           ? "/onboarding/not-approved"
           : "/onboarding/profile"
       );
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Couldn't save that. Try again."
-      );
+      setError(err instanceof Error ? err.message : "Couldn't save that. Try again.");
       setSubmitting(false);
     }
   }
+
+  // Wrapped the state update in startTransition to prevent cascading render warnings
+  useEffect(() => {
+    if (resumed) return;
+    if (!roleFromUrl || !hydrated || !userId) return;
+
+    startTransition(() => {
+      setResumed(true);
+    });
+
+    const timer = setTimeout(() => {
+      void saveRole(userId, roleFromUrl);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [roleFromUrl, hydrated, userId, resumed]);
+
+  function handleContinue() {
+    if (!selected) return;
+
+    const currentUserId = useSessionStore.getState().userId;
+    if (currentUserId) {
+      void saveRole(currentUserId, selected);
+      return;
+    }
+
+    const token = ++retryTokenRef.current;
+    setWaitingForSession(true);
+    setError(null);
+
+    const role = selected;
+    let attempts = 0;
+    const interval = window.setInterval(() => {
+      if (retryTokenRef.current !== token) {
+        window.clearInterval(interval);
+        return;
+      }
+
+      attempts += 1;
+      const uid = useSessionStore.getState().userId;
+
+      if (uid) {
+        window.clearInterval(interval);
+        setWaitingForSession(false);
+        void saveRole(uid, role);
+        return;
+      }
+
+      if (attempts >= SESSION_RETRY_MAX_ATTEMPTS) {
+        window.clearInterval(interval);
+        setWaitingForSession(false);
+        const url = new URL(window.location.href);
+        url.searchParams.set(ROLE_PARAM, role);
+        window.location.href = url.toString();
+      }
+    }, SESSION_RETRY_INTERVAL_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      retryTokenRef.current += 1;
+    };
+  }, []);
+
+  const isResuming = Boolean(roleFromUrl) && !resumed;
 
   return (
     <div
@@ -109,6 +168,17 @@ export function RoleChoice({ disabled = false }: RoleChoiceProps) {
         />
       </div>
 
+      {(waitingForSession || isResuming) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-4 flex items-center gap-2 rounded-lg bg-card-alt px-3 py-2 text-sm text-text-muted dark:bg-card-alt dark:text-text-muted"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Waiting for your session to load…
+        </div>
+      )}
+
       {error && (
         <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive dark:bg-destructive/15 dark:text-destructive">
           {error}
@@ -117,11 +187,17 @@ export function RoleChoice({ disabled = false }: RoleChoiceProps) {
 
       <button
         type="button"
-        disabled={disabled || !selected || submitting || !hydrated}
+        disabled={disabled || !selected || submitting || waitingForSession || isResuming || !hydrated}
         onClick={handleContinue}
         className="mt-7 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
       >
-        {!hydrated ? "Loading your session…" : submitting ? "Saving…" : "Continue"}
+        {!hydrated || isResuming
+          ? "Loading your session…"
+          : waitingForSession
+          ? "Waiting for session…"
+          : submitting
+          ? "Saving…"
+          : "Continue"}
       </button>
     </div>
   );

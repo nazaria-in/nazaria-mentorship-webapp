@@ -1,4 +1,4 @@
-// components/onboarding/profile-form.tsx
+// /components/onboarding/profile-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,7 +7,7 @@ import { updateUserProfile } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
 
 const inputClass =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30";
+  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 dark:border-input dark:bg-background dark:text-text-primary";
 
 const textareaClass = `${inputClass} min-h-24 resize-y`;
 
@@ -23,7 +23,6 @@ export function ProfileForm() {
   const [schoolOrOrg, setSchoolOrOrg] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   const canSubmit = !submitting;
 
@@ -43,7 +42,6 @@ export function ProfileForm() {
         interests: splitList(interestsInput),
         schoolOrOrg: schoolOrOrg.trim(),
       });
-      if (role === "mentee"){ router.push("/dashboard/mentee"); }
       router.push(role === "mentor" ? "/pending-approval" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save your profile. Try again.");
@@ -54,22 +52,23 @@ export function ProfileForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm"
+      className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm dark:border-border dark:bg-card dark:shadow-none"
     >
-      <h1 className="text-lg font-heading text-text-primary">Tell us about yourself</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <h1 className="text-lg font-heading text-text-primary dark:text-text-primary">
+        Tell us about yourself
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
         This helps your {role === "mentor" ? "PM" : "mentor"} understand where you&apos;re coming from.
       </p>
 
       <div className="mt-6 space-y-4">
-        <Field label="Bio" htmlFor="bio">
+        <Field label="Bio" htmlFor="bio" optional>
           <textarea
             id="bio"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             className={textareaClass}
             placeholder="A couple sentences about who you are."
-            required
           />
         </Field>
 
@@ -116,12 +115,14 @@ export function ProfileForm() {
         </Field>
       </div>
 
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="mt-4 text-sm text-destructive dark:text-destructive">{error}</p>
+      )}
 
       <button
         type="submit"
         disabled={!canSubmit}
-        className="mt-6 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary dark:text-primary-foreground"
       >
         {submitting ? "Saving…" : "Finish setup"}
       </button>
@@ -151,11 +152,23 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-text-primary">
+      <label
+        htmlFor={htmlFor}
+        className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-text-primary dark:text-text-primary"
+      >
         <span>
-          {label} {optional && <span className="font-normal text-muted-foreground">(optional)</span>}
+          {label}{" "}
+          {optional && (
+            <span className="font-normal text-muted-foreground dark:text-muted-foreground">
+              (optional)
+            </span>
+          )}
         </span>
-        {hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}
+        {hint && (
+          <span className="text-xs font-normal text-muted-foreground dark:text-muted-foreground">
+            {hint}
+          </span>
+        )}
       </label>
       {children}
     </div>

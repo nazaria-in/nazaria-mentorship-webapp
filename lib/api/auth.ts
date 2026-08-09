@@ -174,3 +174,18 @@ export async function refetchSession(): Promise<string | null> {
 
   return profile.id;
 }
+
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/reset-password`,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updatePassword(newPassword: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
+}
