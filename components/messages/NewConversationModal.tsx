@@ -185,7 +185,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Pod 3 check-in"
+              placeholder="e.g. team 3 check-in"
               className="mt-1 w-full rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary outline-none focus:border-primary"
             />
           </div>
@@ -221,7 +221,7 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
               disabled={podsLoading}
               className="w-full rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary"
             >
-              <option value="">{podsLoading ? "Loading pods…" : "Select a pod…"}</option>
+              <option value="">{podsLoading ? "Loading teams..." : "Select a team..."}</option>
               {(mentorPodGroups ?? []).map((pod) => (
                 <option key={pod.id} value={pod.id}>
                   {pod.name}
