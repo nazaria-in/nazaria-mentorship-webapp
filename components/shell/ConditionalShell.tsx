@@ -96,7 +96,7 @@ export function ConditionalShell({ children }: { children: React.ReactNode }) {
               . Access to this page requires administrator approval.
             </>
           }
-          actionLabel="Return to Safety"
+          actionLabel="Return to HomePage"
           actionHref="/"
         />
       );

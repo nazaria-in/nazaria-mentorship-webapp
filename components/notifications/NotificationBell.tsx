@@ -43,12 +43,17 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadNotifications = useCallback(async (): Promise<void> => {
+  const loadNotifications = useCallback(async (reason: string): Promise<void> => {
     if (!userId) return;
     setIsLoading(true);
     try {
       const supabase = createClient();
+      console.log(`[NotificationBell] loadNotifications called — reason: ${reason}`);
       const rows = await fetchNotificationsForUser(supabase, { userId, limit: 30 });
+      console.log(
+        "[NotificationBell] setNotifications with",
+        rows.map((r) => ({ id: r.id, title: r.title, scheduled_for: r.scheduled_for }))
+      );
       setNotifications(rows);
     } finally {
       setIsLoading(false);
@@ -67,7 +72,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
     setIsOpen((prev) => {
       const nextState = !prev;
       if (nextState) {
-        void loadNotifications();
+        void loadNotifications("bell opened");
       }
       return nextState;
     });
@@ -107,12 +112,15 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_notifications", filter: `user_id=eq.${userId}` },
-        () => {
+        (payload) => {
+          console.log("[NotificationBell] realtime event fired", payload.eventType, payload.new ?? payload.old);
           void refreshUnreadCount();
-          if (isOpen) void loadNotifications();
+          if (isOpen) void loadNotifications("realtime event");
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[NotificationBell] realtime channel status:", status);
+      });
 
     return () => {
       controller.abort();
@@ -134,7 +142,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       // requests (and Supabase quota) on backgrounded tabs.
       if (document.visibilityState !== "visible") return;
       void refreshUnreadCount();
-      if (isOpen) void loadNotifications();
+      if (isOpen) void loadNotifications("poll interval");
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
@@ -156,18 +164,36 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
     return allowedTypes === null ? true : allowedTypes.includes(n.type);
   });
 
+  // DEBUG: fires on every render, right before paint. This is the ground
+  // truth for "what the user is actually about to see" — compare this
+  // against the [notifications:fetch] log's row list. If this list has
+  // more/different rows than the most recent fetch log, `notifications`
+  // state is being mutated by something other than loadNotifications
+  // (search the codebase for any other setNotifications( call on this
+  // component, or a parent forcing a remount with stale initial state).
+  console.log(
+    `[NotificationBell] RENDERING ${filteredNotifications.length} card(s) (quickFilter=${quickFilter})`,
+    filteredNotifications.map((n) => ({
+      id: n.id,
+      userNotificationId: n.userNotificationId,
+      type: n.type,
+      title: n.title,
+      scheduled_for: n.scheduled_for,
+    }))
+  );
+
   async function handleMarkAllRead(): Promise<void> {
     if (!userId) return;
     const supabase = createClient();
     const scopedIds = quickFilter === "all" ? undefined : filteredNotifications.map((n) => n.id);
     await markAllNotificationsRead(supabase, userId, scopedIds);
-    await loadNotifications();
+    await loadNotifications("mark all read");
     await refreshUnreadCount();
   }
 
   function handleCardRead(): void {
     void refreshUnreadCount();
-    void loadNotifications();
+    void loadNotifications("card read");
   }
 
   if (!userId) {

@@ -17,7 +17,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     async function hydrateFromUserId(userId: string) {
       const { data: profile } = await supabase
         .from("users")
-        .select("id, role, full_name")
+        .select("id, role, full_name, approval_status")
         .eq("id", userId)
         .single();
 
@@ -26,6 +26,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           userId: profile.id,
           fullName: profile.full_name ?? "Anonymous User",
           role: profile.role as Role,
+          approvalStatus: profile.approval_status,
         });
       } else {
         clearSession();

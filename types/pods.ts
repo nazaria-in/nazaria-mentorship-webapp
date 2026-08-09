@@ -5,9 +5,11 @@ export interface PodMember {
   full_name: string;
 }
 
+
 export interface PodWithMembers {
   id: string;
   name: string;
   cohortId: string;
+  cohortName?: string;
   members: PodMember[];
 }

@@ -1,10 +1,10 @@
-// components/admin/CohortsTab.tsx
+// /components/admin/CohortsTab.tsx
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Plus, Trash2 } from "lucide-react";
 import {
   fetchCohorts,
   fetchPodsForCohort,
@@ -12,11 +12,19 @@ import {
   type CohortSummary,
   type PodSummary,
 } from "@/lib/api/cohorts-browser";
-import { createPod, fetchUsersForPodsTab, assignUserToPod, removeUserFromPod } from "@/lib/api/admin-users";
+import {
+  createPod,
+  createCohort,
+  deleteCohortCascade,
+  deletePodCascade,
+  fetchUsersForPodsTab,
+  assignUserToPod,
+  removeUserFromPod,
+} from "@/lib/api/admin-users";
 import { USER_POD_FIELD_DEFS } from "@/lib/filtering/admin-user-fields";
 import { PeopleGrid } from "@/components/shared/PeopleGrid";
 import { RoleBadge } from "@/components/admin/RoleBadge";
-import { UserProfileSheet } from "@/components/shared/UserProfileSheet";
+import { WarningModal } from "@/components/shared/WarningModal";
 import type { UserCardPerson } from "@/components/shared/UserCard";
 
 type Crumb =
@@ -56,24 +64,153 @@ function Breadcrumbs({ crumb, onNavigate }: { crumb: Crumb; onNavigate: (c: Crum
   );
 }
 
-function CohortList({ onSelect }: { onSelect: (cohort: CohortSummary) => void }) {
-  const { data, isLoading } = useQuery({ queryKey: ["cohorts-list"], queryFn: fetchCohorts });
-  if (isLoading) return <p className="text-sm text-text-muted dark:text-text-muted">Loading cohorts…</p>;
-  if (!data || data.length === 0)
-    return <p className="text-sm text-text-muted dark:text-text-muted">No cohorts yet.</p>;
+function AddCohortForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      createCohort({
+        name,
+        startDate: startDate.trim() === "" ? null : startDate,
+        endDate: endDate.trim() === "" ? null : endDate,
+      }),
+    onSuccess: () => {
+      setName("");
+      setStartDate("");
+      setEndDate("");
+      setOpen(false);
+      onCreated();
+    },
+  });
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 text-sm text-text-accent hover:underline dark:text-text-accent"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        New cohort
+      </button>
+    );
+  }
+
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {data.map((cohort) => (
-        <button
-          key={cohort.id}
-          type="button"
-          onClick={() => onSelect(cohort)}
-          className="text-left bg-card border border-border rounded-xl p-4 hover:border-border-strong transition-colors dark:bg-card dark:border-border"
-        >
-          <p className="font-heading font-semibold text-text-primary dark:text-text-primary">{cohort.name}</p>
-          <p className="text-sm text-text-muted dark:text-text-muted capitalize">{cohort.status}</p>
-        </button>
-      ))}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) mutation.mutate();
+      }}
+      className="flex flex-wrap items-center gap-2 bg-card-alt border border-border rounded-xl p-3 dark:bg-card-alt dark:border-border"
+    >
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Cohort name"
+        autoFocus
+        className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-text-primary dark:border-border dark:bg-card dark:text-text-primary"
+      />
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-text-primary dark:border-border dark:bg-card dark:text-text-primary"
+      />
+      <input
+        type="date"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-text-primary dark:border-border dark:bg-card dark:text-text-primary"
+      />
+      <button
+        type="submit"
+        disabled={mutation.isPending}
+        className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        Create
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="text-sm text-text-muted dark:text-text-muted">
+        Cancel
+      </button>
+    </form>
+  );
+}
+
+function CohortList({ onSelect }: { onSelect: (cohort: CohortSummary) => void }) {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["cohorts-list"], queryFn: fetchCohorts });
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (cohortId: string) => deleteCohortCascade(cohortId),
+    onSuccess: () => {
+      setPendingDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["cohorts-list"] });
+    },
+  });
+
+  const pendingCohort = (data ?? []).find((c) => c.id === pendingDeleteId) ?? null;
+
+  function closeWarning() {
+    setPendingDeleteId(null);
+    deleteMutation.reset();
+  }
+
+  return (
+    <div className="space-y-3">
+      <AddCohortForm onCreated={() => queryClient.invalidateQueries({ queryKey: ["cohorts-list"] })} />
+
+      {isLoading && <p className="text-sm text-text-muted dark:text-text-muted">Loading cohorts…</p>}
+      {!isLoading && (!data || data.length === 0) && (
+        <p className="text-sm text-text-muted dark:text-text-muted">No cohorts yet.</p>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(data ?? []).map((cohort) => (
+          <div
+            key={cohort.id}
+            className="group relative bg-card border border-border rounded-xl p-4 hover:border-border-strong transition-colors dark:bg-card dark:border-border"
+          >
+            <button type="button" onClick={() => onSelect(cohort)} className="block w-full text-left pr-7">
+              <p className="font-heading font-semibold text-text-primary dark:text-text-primary">{cohort.name}</p>
+              <p className="text-sm text-text-muted dark:text-text-muted capitalize">{cohort.status}</p>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPendingDeleteId(cohort.id);
+              }}
+              aria-label={`Delete ${cohort.name}`}
+              className="absolute right-3 top-3 rounded-full p-1 text-text-muted opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 dark:text-text-muted dark:hover:bg-destructive/20 dark:hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <WarningModal
+        open={pendingCohort !== null}
+        variant="danger"
+        title="Delete cohort"
+        description={
+          pendingCohort
+            ? `This will permanently delete "${pendingCohort.name}", all of its teams, and every team's membership. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete cohort"
+        isLoading={deleteMutation.isPending}
+        errorMessage={deleteMutation.error ? deleteMutation.error.message : null}
+        onConfirm={() => {
+          if (pendingDeleteId) deleteMutation.mutate(pendingDeleteId);
+        }}
+        onClose={closeWarning}
+      />
     </div>
   );
 }
@@ -98,7 +235,7 @@ function AddPodForm({ cohortId, onCreated }: { cohortId: string; onCreated: () =
         onClick={() => setOpen(true)}
         className="text-sm text-text-accent hover:underline dark:text-text-accent"
       >
-        + Add pod
+        + Add team
       </button>
     );
   }
@@ -138,6 +275,22 @@ function PodList({ cohortId, onSelect }: { cohortId: string; onSelect: (pod: Pod
     queryKey: ["pods-for-cohort", cohortId],
     queryFn: () => fetchPodsForCohort(cohortId),
   });
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (podId: string) => deletePodCascade(podId),
+    onSuccess: () => {
+      setPendingDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["pods-for-cohort", cohortId] });
+    },
+  });
+
+  const pendingPod = (data ?? []).find((p) => p.id === pendingDeleteId) ?? null;
+
+  function closeWarning() {
+    setPendingDeleteId(null);
+    deleteMutation.reset();
+  }
 
   return (
     <div className="space-y-3">
@@ -151,16 +304,45 @@ function PodList({ cohortId, onSelect }: { cohortId: string; onSelect: (pod: Pod
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         {(data ?? []).map((pod) => (
-          <button
+          <div
             key={pod.id}
-            type="button"
-            onClick={() => onSelect(pod)}
-            className="text-left bg-card border border-border rounded-xl p-4 hover:border-border-strong transition-colors dark:bg-card dark:border-border"
+            className="group relative bg-card border border-border rounded-xl p-4 hover:border-border-strong transition-colors dark:bg-card dark:border-border"
           >
-            <p className="font-medium text-text-primary dark:text-text-primary">{pod.name}</p>
-          </button>
+            <button type="button" onClick={() => onSelect(pod)} className="block w-full text-left pr-7">
+              <p className="font-medium text-text-primary dark:text-text-primary">{pod.name}</p>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPendingDeleteId(pod.id);
+              }}
+              aria-label={`Delete ${pod.name}`}
+              className="absolute right-3 top-3 rounded-full p-1 text-text-muted opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 dark:text-text-muted dark:hover:bg-destructive/20 dark:hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         ))}
       </div>
+
+      <WarningModal
+        open={pendingPod !== null}
+        variant="danger"
+        title="Delete team"
+        description={
+          pendingPod
+            ? `This will permanently delete the team "${pendingPod.name}" and remove all of its members. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete team"
+        isLoading={deleteMutation.isPending}
+        errorMessage={deleteMutation.error ? deleteMutation.error.message : null}
+        onConfirm={() => {
+          if (pendingDeleteId) deleteMutation.mutate(pendingDeleteId);
+        }}
+        onClose={closeWarning}
+      />
     </div>
   );
 }
@@ -181,7 +363,7 @@ function AddMemberPanel({ podId, onAdded }: { podId: string; onAdded: () => void
       queryFn={async (filterState, sortState) => {
         const rows = await fetchUsersForPodsTab(filterState, sortState);
         return rows
-          .filter((r) => r.podId === null && r.approvalStatus === "approved") // was: r.podId !== podId
+          .filter((r) => r.podId === null && r.approvalStatus === "approved")
           .map((r) => ({
             id: r.userId,
             fullName: r.fullName,
@@ -220,7 +402,6 @@ interface PodRosterMember {
 function PodRosterView({ podId, cohortName, podName }: { podId: string; cohortName: string; podName: string }) {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [addingMember, setAddingMember] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -233,17 +414,17 @@ function PodRosterView({ podId, cohortName, podName }: { podId: string; cohortNa
     queryClient.invalidateQueries({ queryKey: ["pod-roster", podId] });
   }
 
+  // Was: set ?user= and open UserProfileSheet. Now: navigate straight to
+  // the admin dashboard scoped view, e.g. /admin?id=<userId>.
   function openProfile(userId: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("user", userId);
-    router.push(`?${params.toString()}`);
+    router.push(`/admin?id=${userId}`);
   }
 
   const members = (data ?? []) as PodRosterMember[];
 
   return (
     <div className="space-y-4">
-      {/* Pod name + Add button share the same header row, per spec */}
+      {/* Team name + Add button share the same header row, per spec */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-text-muted dark:text-text-muted">{cohortName}</p>
@@ -267,7 +448,7 @@ function PodRosterView({ podId, cohortName, podName }: { podId: string; cohortNa
 
       {isLoading && <p className="text-sm text-text-muted dark:text-text-muted">Loading roster…</p>}
       {!isLoading && members.length === 0 && (
-        <p className="text-sm text-text-muted dark:text-text-muted">No members in this pod yet.</p>
+        <p className="text-sm text-text-muted dark:text-text-muted">No members in this team yet.</p>
       )}
 
       <div className="flex flex-col gap-2">
@@ -327,11 +508,6 @@ export function CohortsTab() {
       {crumb.level === "team" && (
         <PodRosterView podId={crumb.id} cohortName={crumb.cohortName} podName={crumb.name} />
       )}
-
-      {/* Reads ?user= — needs a Suspense boundary per app router rules for useSearchParams */}
-      <Suspense fallback={null}>
-        <UserProfileSheet />
-      </Suspense>
     </div>
   );
 }

@@ -1,55 +1,37 @@
-// lib/page-descriptions.ts
-import type { PermissionLevel } from "@/providers/role-provider";
+// components/shell/PageDescriptionShell.tsx
+"use client";
+
+import * as React from "react";
+import { usePathname } from "next/navigation";
+import { useRole } from "@/providers/role-provider";
+import { resolvePageDescription } from "@/lib/page-descriptions";
+
+export interface PageDescriptionShellProps {
+  /**
+   * Optional override — pass explicit children to bypass the config
+   * lookup entirely for a one-off page. Most pages should NOT pass
+   * this; add an entry to lib/page-descriptions.ts instead.
+   */
+  children?: React.ReactNode;
+}
 
 /**
- * Per-page descriptions, keyed by top-level path segment.
- * Value can be:
- *   - a plain string (same copy for every role)
- *   - a partial record keyed by PermissionLevel, with an optional
- *     "default" fallback for roles not explicitly listed
- *
- * Nested routes inherit their section's entry (e.g. /assignments/123
- * uses the "assignments" key) — see resolvePageDescription below.
+ * Renders directly inside AppShell's scrollable <main>, above the page
+ * content — NOT inside the fixed <header>. Resolves its own copy from
+ * lib/page-descriptions.ts based on the current path + role, so any
+ * page gets a description automatically just by adding a config entry.
  */
-type RoleDescriptions = Partial<Record<PermissionLevel | "default", string>>;
+export function PageDescriptionShell({ children }: PageDescriptionShellProps) {
+  const pathname = usePathname();
+  const { permissionLevel } = useRole();
 
-type DescriptionEntry = string | RoleDescriptions;
+  const resolved = children ?? resolvePageDescription(pathname ?? "", permissionLevel);
 
-export const PAGE_DESCRIPTIONS: Record<string, DescriptionEntry> = {
-  dashboard: {
-    mentee: "Here you can see all your pending assignments, pending exit surveys, and any upcoming meetings.",
-    mentor: "Your mentees at a glance, plus anything waiting on you.",
-    default: "Program overview and analytics.", // pm/associate
-  },
-  meetings: "This is where you create/join meetings — after the meeting you will have to fill out the exit survey.",
-  assignments_and_courses: {
-    mentee: "Browse and submit your assignments, courses, and resources here.",
-    mentor: "Dispatch, track, and review your team's assignments, courses, and resources.",
-    default: "Browse and review assignments, courses, and resources across the program.",
-  },
-  chat: "",
-  notifications: "All your notifications in one place.",
-  profile: "Manage your profile details.",
-  admin: "Program administration and oversight tools.",
-};
+  if (!resolved) return null;
 
-/**
- * Resolves the description for a pathname + role.
- * - Falls back from role-specific -> "default" -> undefined (no description).
- * - Keyed by the first path segment, so /assignments/[id] inherits
- *   the "assignments" entry.
- */
-export function resolvePageDescription(
-  pathname: string,
-  role: PermissionLevel
-): string | undefined {
-  const seg = pathname.split("/")[1];
-  if (!seg) return undefined;
-
-  const entry = PAGE_DESCRIPTIONS[seg];
-  if (!entry) return undefined;
-
-  if (typeof entry === "string") return entry;
-
-  return entry[role] ?? entry.default;
+  return (
+    <div className="border-b border-border bg-surface px-4 py-3 text-sm text-text-muted dark:border-white/10 dark:bg-surface">
+      {resolved}
+    </div>
+  );
 }

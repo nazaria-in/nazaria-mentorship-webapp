@@ -5,7 +5,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/shared/Modal";
-import { PeopleGrid } from "@/components/shared/PeopleGrid";
+import { PeopleGrid, type ExplicitGroup } from "@/components/shared/PeopleGrid";
 import type { UserCardPerson } from "@/components/shared/UserCard";
 import { fetchInviteCandidates } from "@/lib/api/meetings";
 import { useRole } from "@/providers/role-provider";
@@ -56,22 +56,12 @@ function toLocalInputValue(iso: string | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
-// ---------------------------------------------------------------------------
-// ASSUMPTION FLAGGED: I don't have types/meetings.ts, so I don't know
-// InviteCandidate's real shape. The old InviteParticipantsPicker only read
-// id/full_name/role and hardcoded approvalStatus: "approved". For "select
-// entire team" to group people correctly, PeopleGrid's groupBy="pod" needs
-// a pod/team identifier per candidate — I'm assuming a `podName` field
-// following the exact same optional-cast pattern already used in
-// ContentItemFormModal.tsx (`(p as { podName?: string }).podName ?? "No
-// week"`/"No team"), rather than inventing a new shape. If InviteCandidate
-// actually names this field differently (e.g. `pod_name`, `team`), update
-// CandidatePerson + groupKeyFn below to match — nothing else needs to
-// change.
-// ---------------------------------------------------------------------------
 interface CandidatePerson extends UserCardPerson {
+  podId?: string;
   podName?: string;
 }
+
+const NO_TEAM_KEY = "__no_team__";
 
 function toCandidatePerson(candidate: InviteCandidate): CandidatePerson {
   return {
@@ -79,7 +69,8 @@ function toCandidatePerson(candidate: InviteCandidate): CandidatePerson {
     fullName: candidate.full_name,
     role: candidate.role,
     approvalStatus: "approved",
-    podName: (candidate as { podName?: string }).podName,
+    podId: candidate.podId,
+    podName: candidate.podName,
   };
 }
 
@@ -118,11 +109,8 @@ interface MeetingFormFieldsProps {
 }
 
 function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingFormFieldsProps): React.JSX.Element {
-
-
-const { role } = useRole();
+  const { role } = useRole();
   const queryClient = useQueryClient();
-  
 
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -132,10 +120,10 @@ const { role } = useRole();
     base.setHours(base.getHours() + 1);
     return toLocalInputValue(base.toISOString());
   });
-const [mountTime] = React.useState(() => Date.now());
+  const [mountTime] = React.useState(() => Date.now());
 
-// This is pure during render because `mountTime` never changes after the initial render
-const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mountTime;
+  // This is pure during render because `mountTime` never changes after the initial render
+  const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mountTime;
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // Floor for the "Starts" picker — can't schedule a meeting in the past.
@@ -144,14 +132,10 @@ const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mount
   const minStartsAt = toLocalInputValue(new Date().toISOString());
 
   // Derived during render — no effect needed.
-
   const isRangeValid = React.useMemo(() => {
     if (!startsAt || !endsAt) return true; // let `required` handle empty fields
     return new Date(startsAt).getTime() < new Date(endsAt).getTime();
   }, [startsAt, endsAt]);
-
-
-
 
   // `role` is `Role | null` while the session is still resolving. Rather
   // than cast past the null, gate the query on role being resolved so
@@ -172,6 +156,26 @@ const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mount
     () => (candidatesQuery.data ?? []).map(toCandidatePerson),
     [candidatesQuery.data]
   );
+
+  // Real team groups derived from the candidates themselves (podId/podName
+  // now come from fetchInviteCandidates, not a hopeful cast). A "No team"
+  // group is appended for anyone without a podId, but only if such people
+  // exist — an all-team-affiliated org shouldn't show a permanent empty
+  // "No team" bucket.
+  const teamGroups: ExplicitGroup[] = React.useMemo(() => {
+    const seen = new Map<string, string>();
+    let hasUnaffiliated = false;
+    for (const p of candidatePeople) {
+      if (p.podId) {
+        if (!seen.has(p.podId)) seen.set(p.podId, p.podName ?? p.podId);
+      } else {
+        hasUnaffiliated = true;
+      }
+    }
+    const groups: ExplicitGroup[] = Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
+    if (hasUnaffiliated) groups.push({ key: NO_TEAM_KEY, label: "No team" });
+    return groups;
+  }, [candidatePeople]);
 
   const mutation = useMutation({
     mutationFn: createMeetingRequest,
@@ -268,12 +272,13 @@ const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mount
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-text-primary dark:text-text-primary">Invite</span>
         {/*
-          Uses PeopleGrid directly (InviteParticipantsPicker retired — see
-          note at top of file). groupBy="pod" + the "No team" fallback in
-          groupKeyFn means: (a) selecting a whole team is just the group's
-          existing select-all checkbox, no separate cohort UI needed, and
-          (b) mentees without a team still show up, under "No team",
-          satisfying item 8.2 for free rather than needing a special case.
+          explicitGroups carries every team the candidate pool touches
+          (built from real podId/podName on each candidate, not a cast),
+          so a team with zero OTHER members still shows up with a working
+          — if inert — select-all. groupKeyFn falls back to NO_TEAM_KEY for
+          anyone without a podId; PeopleGrid buckets any stragglers whose
+          key isn't in explicitGroups into a trailing "Other" group, so
+          nobody silently disappears if the two ever drift.
         */}
         {candidatesQuery.isLoading ? (
           <p className="text-sm text-text-muted dark:text-text-muted">Loading people…</p>
@@ -289,7 +294,8 @@ const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mount
                 : candidatePeople;
             }}
             groupBy="pod"
-            groupKeyFn={(p) => (p as CandidatePerson).podName ?? "No team"}
+            groupKeyFn={(p) => (p as CandidatePerson).podId ?? NO_TEAM_KEY}
+            explicitGroups={teamGroups}
             selectable
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}

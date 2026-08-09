@@ -28,7 +28,16 @@ export async function fetchMenteeOverview(scope: AdminScope): Promise<MenteeOver
       ? supabase.from("users").select("full_name").in("id", scope.podMentorIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("v_mentee_assignment_status").select("completion_status").eq("mentee_id", scope.userId),
-    supabase.from("resources_and_courses").select("status").eq("assigned_to", scope.userId).is("deleted_at", null),
+    // FIXED: resources_and_courses doesn't exist. Resources/courses are
+    // content_dispatches joined to content_items filtered by content_type,
+    // same as assignments — just without v_mentee_assignment_status's
+    // richer states, so completion is derived from completed_at directly.
+    supabase
+      .from("content_dispatches")
+      .select("completed_at, content_item:content_items!inner(content_type)")
+      .eq("mentee_id", scope.userId)
+      .in("content_item.content_type", ["course", "resource"])
+      .is("content_item.deleted_at", null),
     fetchSubmittedExitSurveysForUser(scope.userId),
   ]);
 
@@ -38,12 +47,12 @@ export async function fetchMenteeOverview(scope: AdminScope): Promise<MenteeOver
   if (resourceRows.error) throw resourceRows.error;
 
   const assignments = (assignmentRows.data ?? []) as { completion_status: string }[];
-  const resources = (resourceRows.data ?? []) as { status: string }[];
+  const resources = (resourceRows.data ?? []) as { completed_at: string | null }[];
 
-  const resourceStatusCounts: Record<string, number> = {};
-  for (const r of resources) {
-    resourceStatusCounts[r.status] = (resourceStatusCounts[r.status] ?? 0) + 1;
-  }
+  const resourceStatusCounts: Record<string, number> = {
+    completed: resources.filter((r) => r.completed_at !== null).length,
+    not_started: resources.filter((r) => r.completed_at === null).length,
+  };
 
   return {
     podName: (podRow.data as { name: string } | null)?.name ?? null,
@@ -54,7 +63,6 @@ export async function fetchMenteeOverview(scope: AdminScope): Promise<MenteeOver
     latestSurvey: surveys[0] ?? null,
   };
 }
-
 export interface MentorOverview {
   podName: string | null;
   mentees: UserCardPerson[];
@@ -84,5 +92,39 @@ export async function fetchMentorOverview(scope: AdminScope): Promise<MentorOver
     completedAssignments: statsRow?.completed_assignments ?? 0,
     totalAssignments: statsRow?.total_assignments ?? 0,
     openEscalations: statsRow?.open_escalations_among_mentees ?? 0,
+  };
+}
+
+export interface MenteeProfileDetails {
+  fullName: string | null;
+  email: string | null;
+  role: string;
+  approvalStatus: string;
+  schoolOrOrg: string | null;
+  bio: string | null;
+  backgroundNotes: string | null;
+  goals: string[] | null;
+  interests: string[] | null;
+}
+
+export async function fetchMenteeProfileDetails(userId: string): Promise<MenteeProfileDetails> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("full_name, email, role, approval_status, school_or_org, bio, background_notes, goals, interests")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+
+  return {
+    fullName: data.full_name as string | null,
+    email: data.email as string | null,
+    role: data.role as string,
+    approvalStatus: data.approval_status as string,
+    schoolOrOrg: data.school_or_org as string | null,
+    bio: data.bio as string | null,
+    backgroundNotes: data.background_notes as string | null,
+    goals: data.goals as string[] | null,
+    interests: data.interests as string[] | null,
   };
 }

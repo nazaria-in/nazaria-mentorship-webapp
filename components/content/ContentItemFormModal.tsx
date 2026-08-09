@@ -2,6 +2,10 @@
 
 "use client";
 
+import { useRole } from "@/providers/role-provider";
+import { deleteTag } from "@/lib/api/content-items";
+
+
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, ClipboardList, FileBox, Plus, X } from "lucide-react";
@@ -397,6 +401,12 @@ export function ContentItemFormModal({
                   await refetchTags();
                   setTagIds((prev) => [...prev, tag.id]);
                 }}
+                onTagDeleted={(tagId) => {
+                  queryClient.setQueryData<{ id: string; name: string }[]>(["tags"], (prev) =>
+                    (prev ?? []).filter((t) => t.id !== tagId)
+                  );
+                  setTagIds((prev) => prev.filter((id) => id !== tagId));
+                }}
               />
             </Field>
 
@@ -729,14 +739,20 @@ function TagMultiSelect({
   selectedIds,
   onChange,
   onCreateTag,
+  onTagDeleted,
 }: {
   allTags: { id: string; name: string }[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   onCreateTag: (name: string) => Promise<void>;
+  onTagDeleted: (tagId: string) => void;
 }) {
+  const { permissionLevel } = useRole();
+  const canDeleteTags = permissionLevel === "mentor" || permissionLevel === "staff";
+
   const [creating, setCreating] = React.useState(false);
   const [newTagName, setNewTagName] = React.useState("");
+  const [deletingTagId, setDeletingTagId] = React.useState<string | null>(null);
 
   function toggle(id: string) {
     onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]);
@@ -750,21 +766,49 @@ function TagMultiSelect({
     setCreating(false);
   }
 
+  async function handleDelete(tagId: string, tagName: string) {
+    const confirmed = window.confirm(
+      `Delete the tag "${tagName}"? This removes it from every item using it — the items themselves aren't affected. This can't be undone.`
+    );
+    if (!confirmed) return;
+    setDeletingTagId(tagId);
+    try {
+      await deleteTag(tagId);
+      onTagDeleted(tagId);
+    } catch (err) {
+      console.error("[TagMultiSelect] Failed to delete tag", tagId, err);
+      window.alert("Couldn't delete that tag. Try again.");
+    } finally {
+      setDeletingTagId(null);
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {allTags.map((tag) => (
-        <button
+        <span
           key={tag.id}
-          type="button"
-          onClick={() => toggle(tag.id)}
-          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             selectedIds.includes(tag.id)
               ? "bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground"
               : "border border-border text-text-muted hover:text-text-primary dark:border-border dark:text-text-muted dark:hover:text-text-primary"
           }`}
         >
-          {tag.name}
-        </button>
+          <button type="button" onClick={() => toggle(tag.id)}>
+            {tag.name}
+          </button>
+          {canDeleteTags && (
+            <button
+              type="button"
+              onClick={() => handleDelete(tag.id, tag.name)}
+              disabled={deletingTagId === tag.id}
+              aria-label={`Delete tag ${tag.name}`}
+              className="rounded-full p-0.5 hover:bg-black/10 disabled:opacity-50 dark:hover:bg-white/10"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          )}
+        </span>
       ))}
 
       {creating ? (

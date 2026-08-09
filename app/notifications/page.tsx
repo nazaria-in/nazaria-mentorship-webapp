@@ -30,8 +30,26 @@ const PAGE_SIZE = 25;
 
 export default function NotificationsPage(): React.JSX.Element {
   const userId = useSessionStore((s) => s.userId);
+  const hydrated = useSessionStore((s) => s.hydrated);
 
-  // Early return UI state when no authenticated user exists
+  // Instant top-level log on every render pass
+  console.log("[NotificationsPage] Top level render", { userId, hydrated });
+
+  // Log immediately on mount and whenever userId or hydration state changes
+  useEffect(() => {
+    console.log("[NotificationsPage] Session state changed", { userId, hydrated });
+  }, [userId, hydrated]);
+
+  // 1. Wait for session store hydration before making an authentication judgment
+  if (!hydrated) {
+    return (
+      <div className="mx-auto max-w-2xl p-6 text-center text-sm text-text-muted">
+        Checking session...
+      </div>
+    );
+  }
+
+  // 2. Hydration finished: Show login prompt if still unauthenticated
   if (!userId) {
     return (
       <div className="mx-auto max-w-2xl p-6">
@@ -54,6 +72,7 @@ export default function NotificationsPage(): React.JSX.Element {
     );
   }
 
+  // 3. User is authenticated and store is hydrated -> Mount main notifications view
   return <AuthenticatedNotificationsPage userId={userId} />;
 }
 
@@ -75,6 +94,7 @@ function AuthenticatedNotificationsPage({
       setIsLoading(true);
       try {
         const supabase = createClient();
+        console.log("[NotificationsPage] loadInitialData called", { onlyUnread, selectedTypes });
         const rows = await fetchNotificationsForUser(supabase, {
           userId, // Guaranteed string
           onlyUnread,
@@ -83,6 +103,10 @@ function AuthenticatedNotificationsPage({
         });
 
         if (!ignore) {
+          console.log(
+            "[NotificationsPage] setNotifications (initial) with",
+            rows.map((r) => ({ id: r.id, title: r.title, scheduled_for: r.scheduled_for }))
+          );
           setNotifications(rows);
           setHasMore(rows.length === PAGE_SIZE);
         }
@@ -125,6 +149,7 @@ function AuthenticatedNotificationsPage({
 
   async function refreshNotifications(): Promise<void> {
     const supabase = createClient();
+    console.log("[NotificationsPage] refreshNotifications called");
     const rows = await fetchNotificationsForUser(supabase, {
       userId,
       onlyUnread,
@@ -155,6 +180,18 @@ function AuthenticatedNotificationsPage({
   function handleCardRead(): void {
     void refreshNotifications();
   }
+
+  // DEBUG: fires on every render, right before paint
+  console.log(
+    `[NotificationsPage] RENDERING ${notifications.length} card(s)`,
+    notifications.map((n) => ({
+      id: n.id,
+      userNotificationId: n.userNotificationId,
+      type: n.type,
+      title: n.title,
+      scheduled_for: n.scheduled_for,
+    }))
+  );
 
   return (
     <div className="mx-auto max-w-2xl p-6">

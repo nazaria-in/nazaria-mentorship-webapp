@@ -53,4 +53,7 @@ export interface InviteCandidate {
   id: string;
   full_name: string;
   role: UserRole;
+  /** Team (pod) this candidate belongs to, if any. Absent = no team. */
+  podId?: string;
+  podName?: string;
 }

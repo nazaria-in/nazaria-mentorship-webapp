@@ -1,4 +1,4 @@
-// lib/api/people-picker.ts
+// /lib/api/people-picker.ts
 
 import { fetchPodMemberGroups, type FetchPodMemberGroupsParams } from "@/lib/api/pods";
 import type { UserCardPerson } from "@/components/shared/UserCard";
@@ -31,7 +31,7 @@ export async function fetchSelectablePeople(
         fullName: member.full_name,
         role: params.role,
         approvalStatus: "approved",
-        podName: pod.name,
+        podName: pod.cohortName ? `${pod.cohortName} — ${pod.name}` : pod.name,
         podId: pod.id,
       });
     }

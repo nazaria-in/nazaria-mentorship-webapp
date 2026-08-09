@@ -1,7 +1,7 @@
 // /lib/api/meetings.ts
 
 import { createClient } from "@/lib/supabase/client";
-import { fetchPodMemberGroups } from "@/lib/api/pods";
+import { fetchPodMemberGroups, fetchAllPodGroupsForRoles } from "@/lib/api/pods";
 import { cancelMeetingRemindersForParticipant } from "@/lib/notifications/meeting-notifications";
 import type { UserRole } from "@/types/users";
 import type {
@@ -209,17 +209,46 @@ export async function respondToMeetingInvite(
 
 /**
  * Invite candidates for the creation form.
- * - mentor/mentee: every member (mentor + mentee) of the requester's own team(s).
- * - pm/associate: every approved user.
+ * - mentor/mentee: every member (mentor + mentee) of the requester's own team(s),
+ *   including teams the requester belongs to that currently have no other members.
+ * - pm/associate: every approved user, ACROSS EVERY TEAM/COHORT, including
+ *   teams with zero members — so the invite picker can group by team and
+ *   let staff "select everyone on Team X" even for a freshly created,
+ *   still-empty team.
  * Self is always excluded.
  */
 export async function fetchInviteCandidates(
   requesterId: string,
   requesterRole: UserRole,
 ): Promise<InviteCandidate[]> {
-  const supabase = createClient();
-
   if (requesterRole === "pm" || requesterRole === "associate") {
+    const groups = await fetchAllPodGroupsForRoles(["mentor", "mentee"]);
+
+    const candidates: InviteCandidate[] = [];
+    const seen = new Set<string>();
+    for (const pod of groups) {
+      for (const m of pod.members) {
+        if (m.id === requesterId || seen.has(m.id)) continue;
+        seen.add(m.id);
+        candidates.push({
+          id: m.id,
+          full_name: m.full_name,
+          // fetchAllPodGroupsForRoles doesn't return role per-member — refetch
+          // isn't worth it here; role badge for staff-view candidates isn't
+          // load-bearing for invite selection, so default to "mentee" is
+          // wrong if precision matters. FLAG: if role needs to be exact per
+          // candidate, fetchAllPodGroupsForRoles needs to return it per member.
+          role: "mentee",
+          podId: pod.id,
+          podName: pod.cohortName ? `${pod.cohortName} — ${pod.name}` : pod.name,
+        });
+      }
+    }
+
+    // Staff can also invite users unaffiliated with any team, and the role
+    // badge for pod members above is a placeholder — pull the real roster
+    // (with roles) and merge, using pod assignment where we found one.
+    const supabase = createClient();
     const { data, error } = await supabase
       .from("users")
       .select("id, full_name, role")
@@ -227,17 +256,23 @@ export async function fetchInviteCandidates(
       .eq("approval_status", "approved")
       .neq("id", requesterId)
       .order("full_name", { ascending: true });
-
     if (error) throw error;
 
-    return (data ?? []).map((u) => ({
-      id: u.id as string,
-      full_name: (u.full_name as string | null)?.trim() || "Unnamed",
-      role: u.role as UserRole,
-    }));
+    const podById = new Map(candidates.map((c) => [c.id, c]));
+    return (data ?? []).map((u) => {
+      const podInfo = podById.get(u.id as string);
+      return {
+        id: u.id as string,
+        full_name: (u.full_name as string | null)?.trim() || "Unnamed",
+        role: u.role as UserRole,
+        podId: podInfo?.podId,
+        podName: podInfo?.podName,
+      };
+    });
   }
 
-  // mentor or mentee: merge both roles across the requester's own team(s)
+  // mentor or mentee: merge both roles across the requester's own team(s),
+  // including empty ones (e.g. requester is the only member so far).
   const [mentorGroups, menteeGroups] = await Promise.all([
     fetchPodMemberGroups({ role: "mentor", mentorId: requesterId, includeEmptyPods: true }),
     fetchPodMemberGroups({ role: "mentee", mentorId: requesterId, includeEmptyPods: true }),
@@ -247,12 +282,28 @@ export async function fetchInviteCandidates(
 
   for (const pod of mentorGroups) {
     for (const m of pod.members) {
-      if (m.id !== requesterId) byId.set(m.id, { id: m.id, full_name: m.full_name, role: "mentor" });
+      if (m.id !== requesterId) {
+        byId.set(m.id, {
+          id: m.id,
+          full_name: m.full_name,
+          role: "mentor",
+          podId: pod.id,
+          podName: pod.cohortName ? `${pod.cohortName} — ${pod.name}` : pod.name,
+        });
+      }
     }
   }
   for (const pod of menteeGroups) {
     for (const m of pod.members) {
-      if (m.id !== requesterId) byId.set(m.id, { id: m.id, full_name: m.full_name, role: "mentee" });
+      if (m.id !== requesterId) {
+        byId.set(m.id, {
+          id: m.id,
+          full_name: m.full_name,
+          role: "mentee",
+          podId: pod.id,
+          podName: pod.cohortName ? `${pod.cohortName} — ${pod.name}` : pod.name,
+        });
+      }
     }
   }
 

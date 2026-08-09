@@ -261,3 +261,67 @@ export async function fetchPodFirstMentors(): Promise<PodFirstMentor[]> {
   }
   return result;
 }
+
+export interface CreateCohortInput {
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export async function createCohort(input: CreateCohortInput): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("cohorts").insert({
+    name: input.name,
+    start_date: input.startDate,
+    end_date: input.endDate,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Deletes every pod under this cohort plus their pod_members rows, then
+ * soft-deletes the cohort itself. Users are never touched — only their
+ * pod_members membership rows are removed, same as removeUserFromPod.
+ * Order matters: pod_members → pods → cohort, so nothing is left
+ * pointing at a row that no longer exists.
+ */
+export async function deleteCohortCascade(cohortId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: pods, error: podsError } = await supabase
+    .from("pods")
+    .select("id")
+    .eq("cohort_id", cohortId)
+    .is("deleted_at", null);
+  if (podsError) throw new Error(podsError.message);
+
+  const podIds = (pods ?? []).map((p) => p.id as string);
+  if (podIds.length > 0) {
+    const { error: membersError } = await supabase.from("pod_members").delete().in("pod_id", podIds);
+    if (membersError) throw new Error(membersError.message);
+
+    const { error: podsDeleteError } = await supabase
+      .from("pods")
+      .update({ deleted_at: new Date().toISOString() })
+      .in("id", podIds);
+    if (podsDeleteError) throw new Error(podsDeleteError.message);
+  }
+
+  const { error: cohortError } = await supabase
+    .from("cohorts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", cohortId);
+  if (cohortError) throw new Error(cohortError.message);
+}
+
+/** Standalone pod deletion — removes membership rows, then soft-deletes the pod. */
+export async function deletePodCascade(podId: string): Promise<void> {
+  const supabase = createClient();
+  const { error: membersError } = await supabase.from("pod_members").delete().eq("pod_id", podId);
+  if (membersError) throw new Error(membersError.message);
+
+  const { error: podError } = await supabase
+    .from("pods")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", podId);
+  if (podError) throw new Error(podError.message);
+}

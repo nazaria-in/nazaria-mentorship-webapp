@@ -21,11 +21,11 @@ export const PAGE_DESCRIPTIONS: Record<string, DescriptionEntry> = {
     mentor: "Your mentees at a glance, plus anything waiting on you.",
     default: "Program overview and analytics.", // pm/associate
   },
-  meetings: "This is where you Create/Join meetings — after the meeting you will have to fill the exit survey.",
+  meetings: "This is where you create/join meetings — after the meeting you will have to fill out the exit survey.",
   assignments_and_courses: {
-    mentee: "Browse and submit your Assignments, Courses, Resources here.",
-    mentor: "Dispatch, track, and review your Team's Assignments, Courses, Resources.",
-    default: "Browse and review Assignments, Courses, Resources across the program.",
+    mentee: "Browse and submit your assignments, courses, and resources here.",
+    mentor: "Dispatch, track, and review your team's assignments, courses, and resources.",
+    default: "Browse and review assignments, courses, and resources across the program.",
   },
   chat: "",
   notifications: "All your notifications in one place.",

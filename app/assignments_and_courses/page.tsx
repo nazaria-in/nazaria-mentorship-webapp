@@ -9,11 +9,14 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import { CollapsibleSection } from "@/components/shared/CollapsibleSection";
 import { EmptyState } from "@/components/shared/EmptyState";
+
 import { SmartFilterBar } from "@/components/filters/SmartFilterBar";
 import { useFilterState } from "@/hooks/use-filter-state";
 import { useContentFieldDefs } from "@/lib/filtering/content-fields";
+
 import { fetchContentItems, fetchTags, fetchWeeks, softDeleteContentItem } from "@/lib/api/content-items";
 import { fetchMenteeContentDispatches } from "@/lib/api/content-dispatches";
+
 import { ContentItemCard } from "@/components/content/ContentItemCard";
 import { MenteeContentCard } from "@/components/content/MenteeContentCard";
 import { ContentItemFormModal } from "@/components/content/ContentItemFormModal";
@@ -74,7 +77,8 @@ function matchesStatusFilter(d: MenteeContentDispatch, filter: StatusFilter): bo
   const isDone = DONE_STATUSES.includes(d.completion_status);
   if (filter === "completed") return isDone;
 
-  const isOverdue = !isDone && !!d.due_at && new Date(d.due_at).getTime() < Date.now();
+  const effectiveDeadline = d.due_at ?? d.content_item.submission_ends_at;
+  const isOverdue = !isDone && !!effectiveDeadline && new Date(effectiveDeadline).getTime() < Date.now();
   if (filter === "overdue") return isOverdue;
 
   const startsAt = d.content_item.submission_starts_at;

@@ -10,6 +10,11 @@ import { UserCard, type UserCardPerson } from "@/components/shared/UserCard";
 import { WarningModal } from "@/components/shared/WarningModal";
 import type { FilterFieldDef, FilterState, SortState } from "@/lib/filtering/types";
 
+export interface ExplicitGroup {
+  key: string;
+  label: string;
+}
+
 export interface PeopleGridProps {
   fieldDefs: FilterFieldDef[];
   viewKey: string;
@@ -18,6 +23,16 @@ export interface PeopleGridProps {
   renderActions?: (person: UserCardPerson) => React.ReactNode;
   groupBy?: "pod" | "none";
   groupKeyFn?: (person: UserCardPerson) => string;
+  /**
+   * Full set of groups to render, independent of who's currently fetched
+   * into `data` — e.g. every team including ones with zero members right
+   * now. When provided, every group here always renders (0/0 count is
+   * fine, select-all is simply a no-op via the existing `disabled` guard
+   * below), in the given order. Any fetched person whose groupKeyFn result
+   * isn't in this list falls into a trailing "Other" group so nobody is
+   * silently dropped. Ignored when groupBy is "none".
+   */
+  explicitGroups?: ExplicitGroup[];
   computeClickable?: (person: UserCardPerson) => boolean;
   emptyMessage?: string;
   defaultView?: "list" | "card";
@@ -49,6 +64,8 @@ export interface PeopleGridProps {
   removalWarningDescription?: (memberNames: string[]) => string;
 }
 
+const OTHER_GROUP_KEY = "__other__";
+
 export function PeopleGrid({
   fieldDefs,
   viewKey,
@@ -57,6 +74,7 @@ export function PeopleGrid({
   renderActions,
   groupBy = "none",
   groupKeyFn,
+  explicitGroups,
   computeClickable,
   emptyMessage = "No one matches these filters.",
   defaultView = "list",
@@ -82,6 +100,25 @@ export function PeopleGrid({
     if (groupBy === "none") return [{ key: null, label: null, people }];
 
     const keyFn = groupKeyFn ?? (() => "Ungrouped");
+
+    if (explicitGroups && explicitGroups.length > 0) {
+      const buckets = new Map<string, UserCardPerson[]>(explicitGroups.map((g) => [g.key, []]));
+      const otherBucket: UserCardPerson[] = [];
+      for (const person of people) {
+        const key = keyFn(person);
+        if (buckets.has(key)) {
+          buckets.get(key)!.push(person);
+        } else {
+          otherBucket.push(person);
+        }
+      }
+      const result = explicitGroups.map((g) => ({ key: g.key, label: g.label, people: buckets.get(g.key) ?? [] }));
+      if (otherBucket.length > 0) {
+        result.push({ key: OTHER_GROUP_KEY, label: "Other", people: otherBucket });
+      }
+      return result;
+    }
+
     const map = new Map<string, UserCardPerson[]>();
     for (const person of people) {
       const key = keyFn(person);
@@ -90,7 +127,7 @@ export function PeopleGrid({
       map.set(key, list);
     }
     return Array.from(map.entries()).map(([key, people]) => ({ key, label: key, people }));
-  }, [data, groupBy, groupKeyFn]);
+  }, [data, groupBy, groupKeyFn, explicitGroups]);
 
   // ---- Selectable-mode state (ported from PodMemberSelector) ----
   const value = selectedIds ?? [];
@@ -127,6 +164,7 @@ export function PeopleGrid({
   }
 
   function toggleGroup(memberIds: string[], allSelected: boolean) {
+    if (memberIds.length === 0) return; // empty team — nothing to toggle
     if (allSelected) {
       const committedInGroup = onRemoveCommitted ? memberIds.filter((id) => committedSet.has(id)) : [];
       const plainRemovable = memberIds.filter((id) => !committedInGroup.includes(id));
@@ -186,7 +224,7 @@ export function PeopleGrid({
           {error instanceof Error ? error.message : "Couldn't load people."}
         </p>
       )}
-      {!isLoading && (data ?? []).length === 0 && (
+      {!isLoading && (data ?? []).length === 0 && !explicitGroups && (
         <p className="text-sm text-text-muted dark:text-text-muted">{emptyMessage}</p>
       )}
 
@@ -212,30 +250,34 @@ export function PeopleGrid({
                 <h4 className="text-sm font-semibold text-text-muted dark:text-text-muted">{group.label}</h4>
               )
             )}
-            <div className={view === "card" ? "grid gap-2 sm:grid-cols-2" : "flex flex-col gap-2"}>
-              {group.people.map((person) =>
-                selectable ? (
-                  <UserCard
-                    key={person.id}
-                    person={person}
-                    view={view}
-                    clickable={false}
-                    selected={selectedSet.has(person.id)}
-                    onToggleSelect={() => toggleMember(person.id)}
-                    committed={committedSet.has(person.id)}
-                  />
-                ) : (
-                  <UserCard
-                    key={person.id}
-                    person={person}
-                    view={view}
-                    clickable={computeClickable?.(person) ?? false}
-                  >
-                    {renderActions?.(person)}
-                  </UserCard>
-                )
-              )}
-            </div>
+            {memberIds.length === 0 ? (
+              <p className="pl-1 text-xs text-text-muted/70 dark:text-text-muted/70">No members yet.</p>
+            ) : (
+              <div className={view === "card" ? "grid gap-2 sm:grid-cols-2" : "flex flex-col gap-2"}>
+                {group.people.map((person) =>
+                  selectable ? (
+                    <UserCard
+                      key={person.id}
+                      person={person}
+                      view={view}
+                      clickable={false}
+                      selected={selectedSet.has(person.id)}
+                      onToggleSelect={() => toggleMember(person.id)}
+                      committed={committedSet.has(person.id)}
+                    />
+                  ) : (
+                    <UserCard
+                      key={person.id}
+                      person={person}
+                      view={view}
+                      clickable={computeClickable?.(person) ?? false}
+                    >
+                      {renderActions?.(person)}
+                    </UserCard>
+                  )
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -307,7 +349,11 @@ function GroupSelectAllHeader({
   );
 
   return (
-    <label className="flex cursor-pointer items-center gap-2 border-b border-border pb-1.5 dark:border-border">
+    <label
+      className={`flex items-center gap-2 border-b border-border pb-1.5 dark:border-border ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+      }`}
+    >
       <input
         ref={setIndeterminateRef}
         type="checkbox"

@@ -27,11 +27,6 @@ function resolveClient(clientOrPayload: unknown): { client: NotificationsClient;
  * notifications). Practically: everything created here goes out on the
  * next cron tick, whether it was scheduled for the future or "now".
  * Returns the new notification's id.
- *
- * CHANGED: `mentee_assignment_id`/`resource_id` → `content_dispatch_id`/
- * `content_submission_id`, matching the real `notifications` table columns
- * you confirmed. This was a live bug independent of the content rework —
- * the previous insert wrote to columns that don't exist on the real table.
  */
 export async function createNotification(input: CreateNotificationInput): Promise<string>;
 export async function createNotification(supabase: NotificationsClient, input: CreateNotificationInput): Promise<string>;
@@ -82,6 +77,22 @@ export async function createNotification(
   if (fanOutError) {
     throw new Error(`Notification created but fan-out failed: ${fanOutError.message}`);
   }
+
+  // DEBUG: confirms exactly what was written and to whom, at the moment of
+  // creation — pairs with the [notifications:fetch] log below so a
+  // mismatch between "what was written" and "what the view later returns"
+  // is visible without a manual SQL round-trip. Remove once the display
+  // bug investigation is closed.
+  console.log("[notifications:create]", {
+    notificationId,
+    type: input.type,
+    title: input.title,
+    scheduledFor: scheduledFor.toISOString(),
+    recipientUserIds: input.recipientUserIds,
+    contentDispatchId: input.contentDispatchId ?? null,
+    exitSurveyId: input.exitSurveyId ?? null,
+    meetingId: input.meetingId ?? null,
+  });
 
   return notificationId;
 }
@@ -157,15 +168,13 @@ export async function markNotificationRead(
 }
 
 /**
- * Marks every currently-unread, non-deleted notification for a user as
- * read. `scopedNotificationIds`, when passed, restricts this to whatever
- * filter is active on the caller's list — omit it to mark everything read.
+ * Marks every currently-unread, non-deleted, currently-VISIBLE notification
+ * for a user as read — scoped through v_visible_user_notifications so a
+ * future-dated reminder can never be marked read before the user could
+ * have actually seen it.
  */
 export async function markAllNotificationsRead(userId: string, scopedNotificationIds?: string[]): Promise<void>;
 export async function markAllNotificationsRead(supabase: NotificationsClient, userId: string, scopedNotificationIds?: string[]): Promise<void>;
-// markAllNotificationsRead — now scopes to what's actually visible, so a
-// future-dated reminder can never be marked read before the user could
-// have seen it.
 export async function markAllNotificationsRead(
   clientOrUserId: NotificationsClient | string,
   maybeUserIdOrScopedIds?: string | string[],
@@ -197,6 +206,7 @@ export async function markAllNotificationsRead(
     .in("id", ids);
   if (error) throw error;
 }
+
 export interface FetchNotificationsParams {
   userId: string;
   onlyUnread?: boolean;
@@ -210,6 +220,14 @@ export interface FetchNotificationsParams {
  * Powers both the bell dropdown (small limit, no filters) and the full
  * /notifications page (SmartFilterBar-driven — types/onlyUnread map
  * directly onto FilterFieldDef values there).
+ *
+ * Every call here is the single source of truth for "what should the user
+ * see right now" — it always queries v_visible_user_notifications, never
+ * the base notifications/user_notifications tables directly. If a caller
+ * elsewhere in the codebase queries those base tables and hands rows to a
+ * NotificationCard-rendering component, THAT is a bypass of this function
+ * and would explain a display/view mismatch — the log below only proves
+ * what THIS function returned, not what every code path does.
  */
 export async function fetchNotificationsForUser(params: FetchNotificationsParams): Promise<NotificationWithDelivery[]>;
 export async function fetchNotificationsForUser(supabase: NotificationsClient, params: FetchNotificationsParams): Promise<NotificationWithDelivery[]>;
@@ -219,6 +237,8 @@ export async function fetchNotificationsForUser(
 ): Promise<NotificationWithDelivery[]> {
   const { client, isClientPassed } = resolveClient(clientOrParams);
   const params = isClientPassed ? maybeParams! : (clientOrParams as FetchNotificationsParams);
+
+  const callId = Math.random().toString(36).slice(2, 8);
 
   let query = client
     .from("v_visible_user_notifications")
@@ -230,8 +250,24 @@ export async function fetchNotificationsForUser(
   if (params.onlyUnread) query = query.is("read_at", null);
   if (params.before) query = query.lt("created_at", params.before);
 
+  // DEBUG: logged BEFORE the request fires, with a callId, so overlapping
+  // fetches (e.g. bell poll + realtime handler + manual open, all firing
+  // within the same second) can be told apart in the console instead of
+  // their results being attributed to the wrong trigger.
+  console.log(`[notifications:fetch:${callId}] querying v_visible_user_notifications`, {
+    userId: params.userId,
+    onlyUnread: params.onlyUnread ?? false,
+    types: params.types ?? "all",
+    limit: params.limit ?? 20,
+    before: params.before ?? null,
+    calledAt: new Date().toISOString(),
+  });
+
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    console.log(`[notifications:fetch:${callId}] ERROR`, error);
+    throw error;
+  }
 
   const rows = (data ?? []) as Array<NotificationWithDelivery & {
     user_notification_id: string;
@@ -240,13 +276,28 @@ export async function fetchNotificationsForUser(
 
   const filtered = params.types ? rows.filter((r) => params.types!.includes(r.type)) : rows;
 
-  return filtered.map((r) => ({
+  const mapped = filtered.map((r) => ({
     ...r,
     userNotificationId: r.user_notification_id,
     readAt: r.read_at,
   }));
-}
 
+  // DEBUG: exactly what this call returned, with scheduled_for included so
+  // a row that shouldn't be visible yet is immediately spottable by eye.
+  console.log(
+    `[notifications:fetch:${callId}] → ${mapped.length} row(s)`,
+    mapped.map((r) => ({
+      id: r.id,
+      userNotificationId: r.userNotificationId,
+      type: r.type,
+      title: r.title,
+      scheduled_for: r.scheduled_for,
+      created_at: r.created_at,
+    }))
+  );
+
+  return mapped;
+}
 
 export async function fetchUnreadNotificationCount(userId: string): Promise<number>;
 export async function fetchUnreadNotificationCount(supabase: NotificationsClient, userId: string): Promise<number>;

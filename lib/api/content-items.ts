@@ -169,6 +169,17 @@ export async function createTag(name: string): Promise<Tag> {
   return data as Tag;
 }
 
+/**
+ * Cascades via content_item_tags_tag_id_fkey (ON DELETE CASCADE on
+ * content_item_tags.tag_id) — deleting a tag only removes the join rows
+ * linking it to content items. The content_items rows themselves are
+ * never touched; they simply lose this tag from their tag list.
+ */
+export async function deleteTag(tagId: string): Promise<void> {
+  const { error } = await supabase.from("tags").delete().eq("id", tagId);
+  if (error) throw error;
+}
+
 interface CreateContentItemInput {
   content_type: ContentType;
   title: string;

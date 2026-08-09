@@ -8,6 +8,7 @@ interface PodRow {
   id: string;
   name: string;
   cohort_id: string;
+  cohorts: { name: string } | null;
 }
 
 interface PodMemberRow {
@@ -46,11 +47,11 @@ export async function fetchPodMemberGroups(params: FetchPodMemberGroupsParams): 
     if (podIds.length === 0) return []; // mentor isn't in any pod yet
   }
 
-  let podsQuery = supabase.from("pods").select("id, name, cohort_id").is("deleted_at", null);
+  let podsQuery = supabase.from("pods").select("id, name, cohort_id, cohorts(name)").is("deleted_at", null);
   if (podIds) podsQuery = podsQuery.in("id", podIds);
   const { data: pods, error: podsError } = await podsQuery.order("name", { ascending: true });
   if (podsError) throw podsError;
-  const typedPods = (pods ?? []) as PodRow[];
+  const typedPods = (pods ?? []) as unknown as PodRow[];
   if (typedPods.length === 0) return [];
 
   const relevantPodIds = typedPods.map((p) => p.id);
@@ -77,7 +78,57 @@ export async function fetchPodMemberGroups(params: FetchPodMemberGroupsParams): 
       id: p.id,
       name: p.name,
       cohortId: p.cohort_id,
+      cohortName: p.cohorts?.name,
       members: (membersByPod.get(p.id) ?? []).sort((a, b) => a.full_name.localeCompare(b.full_name)),
     }))
     .filter((pod) => includeEmptyPods || pod.members.length > 0);
+}
+
+/**
+ * Every non-deleted pod across every cohort — including pods with zero
+ * matching members — with members restricted to `roles`. Distinct from
+ * fetchPodMemberGroups (which scopes to one mentor/pod and defaults to
+ * hiding empty pods): this is for staff-facing pickers (invite lists,
+ * roster assignment) where a PM/associate needs to see and select into
+ * every team, populated or not, e.g. "select everyone on an empty team"
+ * being a harmless no-op rather than the team not existing in the UI.
+ */
+export async function fetchAllPodGroupsForRoles(roles: UserRole[]): Promise<PodWithMembers[]> {
+  const supabase = createClient();
+
+  const { data: pods, error: podsError } = await supabase
+    .from("pods")
+    .select("id, name, cohort_id, cohorts(name)")
+    .is("deleted_at", null)
+    .order("name", { ascending: true });
+  if (podsError) throw podsError;
+  const typedPods = (pods ?? []) as unknown as PodRow[];
+  if (typedPods.length === 0) return [];
+
+  const podIds = typedPods.map((p) => p.id);
+
+  const { data: memberRows, error: membersError } = await supabase
+    .from("pod_members")
+    .select("pod_id, user:users!pod_members_user_id_fkey(id, full_name, role, approval_status)")
+    .in("pod_id", podIds);
+  if (membersError) throw membersError;
+  const typedMembers = (memberRows ?? []) as unknown as PodMemberRow[];
+
+  const membersByPod = new Map<string, PodWithMembers["members"]>();
+  for (const row of typedMembers) {
+    if (!row.user) continue;
+    if (!roles.includes(row.user.role)) continue;
+    if (row.user.approval_status !== "approved") continue;
+    const list = membersByPod.get(row.pod_id) ?? [];
+    list.push({ id: row.user.id, full_name: row.user.full_name?.trim() || "Unnamed" });
+    membersByPod.set(row.pod_id, list);
+  }
+
+  return typedPods.map((p) => ({
+    id: p.id,
+    name: p.name,
+    cohortId: p.cohort_id,
+    cohortName: p.cohorts?.name,
+    members: (membersByPod.get(p.id) ?? []).sort((a, b) => a.full_name.localeCompare(b.full_name)),
+  }));
 }

@@ -70,8 +70,8 @@ export default function DashboardPage() {
   // Fetch upcoming meetings using the existing range function setup
   const { data: meetings, isLoading: meetingsLoading } = useQuery<MeetingWithParticipants[]>({
     queryKey: ["meetings", "dashboard", userId, role, rangeStart, rangeEnd],
-    queryFn: () => fetchMeetingsInRange({ userId, role, rangeStart, rangeEnd }),
-    enabled: !!userId,
+    queryFn: () => fetchMeetingsInRange({ userId, role: role!, rangeStart, rangeEnd }),
+    enabled: !!userId && !!role,
   });
 
   const isPmOrAssociate = role === "pm" || role === "associate";
