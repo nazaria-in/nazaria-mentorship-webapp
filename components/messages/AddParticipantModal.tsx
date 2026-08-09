@@ -69,7 +69,7 @@ export function AddParticipantModal({
     <Modal open={isOpen} onClose={onClose} title="Add people">
       <div className="flex flex-col gap-4 max-h-[70vh]">
         <div className="flex-1 overflow-y-auto">
-          {isMentor && kind === "pod" && podId ? (
+          {isMentor && kind === "team" && podId ? (
             <PeopleGrid
               fieldDefs={EMPTY_FIELD_DEFS}
               viewKey="add-participant-mentor"
