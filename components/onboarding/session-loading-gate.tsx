@@ -7,6 +7,9 @@ import { Loader2 } from "lucide-react";
 import { useSessionStore } from "@/store/session-store";
 import { RoleChoice } from "@/components/onboarding/role-choice";
 
+import { Suspense } from "react";
+
+
 const SESSION_WAIT_TIMEOUT_MS = 4000;
 const RELOAD_DELAY_MS = 3000;
 const RELOAD_GUARD_KEY = "nazaria:onboarding-role:reload-attempted";
@@ -81,8 +84,9 @@ export function SessionLoadingGate(): React.JSX.Element {
             : "Checking your session…"}
         </div>
       )}
-
+      <Suspense>
       <RoleChoice disabled={!hydrated} />
+      </Suspense>
     </div>
   );
 }
