@@ -422,7 +422,7 @@ export async function grantStaffAllBroadcastAccess(userId: string): Promise<void
 
 interface NameResolutionInput {
   name: string | null;
-  kind: "direct" | "pod" | "group" | "broadcast";
+  kind: "direct" | "team" | "group" | "broadcast";
   otherParticipantNames: string[] | null;
 }
 
@@ -450,7 +450,7 @@ export function resolveConversationName(input: NameResolutionInput): string {
 
 interface ComposerStateInput {
   canMessage: boolean;
-  kind: "direct" | "pod" | "group" | "broadcast";
+  kind: "direct" | "team" | "group" | "broadcast";
   leftAt: string | null;
   isStaff: boolean;
   isActiveParticipant: boolean;
