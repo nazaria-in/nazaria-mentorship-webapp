@@ -6,8 +6,8 @@ import type { UserCardPerson } from "@/components/shared/UserCard";
 export interface SelectablePerson extends UserCardPerson {
   podName: string;
   podId: string;
-  cohortId: string | null;
-  cohortName: string | null;
+  cohortId?: string | null;
+  cohortName?: string | null;
 }
 
 export interface FetchSelectablePeopleParams extends FetchPodMemberGroupsParams {

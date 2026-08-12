@@ -60,19 +60,21 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
     enabled: isStaff && kind === "broadcast",
   });
 
-  const mentorMentees: SelectablePerson[] = useMemo(() => {
-    if (!selectedPodId || !mentorPodGroups) return [];
-    const pod = mentorPodGroups.find((p) => p.id === selectedPodId);
-    if (!pod) return [];
-    return pod.members.map((m) => ({
-      id: m.id,
-      fullName: m.full_name,
-      role: "mentee" as const,
-      approvalStatus: "approved" as const,
-      podName: pod.name,
-      podId: pod.id,
-    }));
-  }, [selectedPodId, mentorPodGroups]);
+const mentorMentees: SelectablePerson[] = useMemo(() => {
+  if (!selectedPodId || !mentorPodGroups) return [];
+  const pod = mentorPodGroups.find((p) => p.id === selectedPodId);
+  if (!pod) return [];
+  return pod.members.map((m) => ({
+    id: m.id,
+    fullName: m.full_name,
+    role: "mentee" as const,
+    approvalStatus: "approved" as const,
+    podName: pod.name,
+    podId: pod.id,
+    cohortId: pod.cohortId ?? null,      // add
+    cohortName: pod.cohortName ?? null,  // add
+  }));
+}, [selectedPodId, mentorPodGroups]);
 
   const podLocked = isMentor && kind === "team" && !selectedPodId;
   const isBroadcast = kind === "broadcast";
