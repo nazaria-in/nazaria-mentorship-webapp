@@ -35,9 +35,28 @@ import {
 import type { FilterFieldDef } from "@/lib/filtering/types";
 import type { ContentItemWithMeta, Week } from "@/types/content";
 
-const PICKER_FIELD_DEFS: FilterFieldDef[] = [
-  { key: "search", kind: "text", columns: ["full_name"], searchable: true },
-];
+
+import { fetchCohortOptions } from "@/lib/api/admin-users";
+
+
+
+
+
+
+function buildPickerFieldDefs(
+  isStaff: boolean,
+  cohortOptions: { value: string; label: string }[]
+): FilterFieldDef[] {
+  const base: FilterFieldDef[] = [
+    { key: "search", kind: "text", columns: ["full_name"], searchable: true },
+  ];
+  if (!isStaff) return base;
+  return [
+    ...base,
+    { key: "cohort", kind: "entity", label: "Cohort", column: "cohort_id", options: cohortOptions },
+  ];
+}
+
 
 const TYPE_OPTIONS: { value: ContentType; label: string; icon: typeof ClipboardList }[] = [
   { value: "assignment", label: "Assignment", icon: ClipboardList },
@@ -109,6 +128,17 @@ export function ContentItemFormModal({
   // the template without a confirmation — once true, a type switch instead
   // asks first (see handleTypeChange).
   const hasEditedTemplate = React.useRef(false);
+
+  const { permissionLevel } = useRole();
+  const isStaffScoped = permissionLevel === "staff";
+
+  const { data: cohortOptions } = useQuery({
+    queryKey: ["cohort-options"],
+    queryFn: fetchCohortOptions,
+    enabled: open && isStaffScoped,
+  });
+  const pickerFieldDefs = buildPickerFieldDefs(isStaffScoped, cohortOptions ?? []);
+
 
   const { data: weeks } = useQuery({ queryKey: ["weeks"], queryFn: fetchWeeks, enabled: open });
   const { data: tags, refetch: refetchTags } = useQuery({ queryKey: ["tags"], queryFn: fetchTags, enabled: open });
@@ -496,28 +526,37 @@ export function ContentItemFormModal({
             // component's source was available to verify against — confirm
             // this still matches PeopleGrid.tsx's actual prop types before
             // relying on this in production.
-            <PeopleGrid
-              fieldDefs={PICKER_FIELD_DEFS}
-              viewKey={`content-item-roster-${contentItemId ?? "new"}`}
-              queryKey={["selectable-mentees", scopeToMentorId ?? "all"]}
-              queryFn={(filterState) =>
-                fetchSelectablePeople({ role: "mentee", mentorId: scopeToMentorId }, filterState.search)
-              }
-              groupBy="pod"
-              groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No team"}
-              selectable
-              selectedIds={selectedMenteeIds}
-              onSelectionChange={setSelectedMenteeIds}
-              alreadyCommittedIds={mode === "edit" ? effectiveCommittedIds : undefined}
-              onRemoveCommitted={mode === "edit" ? handleRemoveCommitted : undefined}
-              removalWarningTitle="Remove from this item?"
-              removalWarningDescription={(names) =>
-                `This has already been assigned to ${names.join(", ")}. Remove ${
-                  names.length > 1 ? "them" : "this mentee"
-                }? This can't be undone.`
-              }
-              emptyMessage="No teams with mentees found."
-            />
+<PeopleGrid
+  fieldDefs={pickerFieldDefs}
+  viewKey={`content-item-roster-${contentItemId ?? "new"}`}
+  queryKey={["selectable-mentees", isStaffScoped ? "all-cohorts" : scopeToMentorId ?? "all"]}
+  queryFn={(filterState) =>
+    fetchSelectablePeople(
+      {
+        role: "mentee",
+        mentorId: isStaffScoped ? undefined : scopeToMentorId,
+        cohortId: (filterState.values.cohort as string | undefined) ?? undefined,
+      },
+      filterState.search
+    )
+  }
+  groupBy="pod"
+  groupKeyFn={(p) => (p as { podName?: string }).podName ?? "No team"}
+  selectable
+  selectedIds={selectedMenteeIds}
+  onSelectionChange={setSelectedMenteeIds}
+  alreadyCommittedIds={mode === "edit" ? effectiveCommittedIds : undefined}
+  onRemoveCommitted={mode === "edit" ? handleRemoveCommitted : undefined}
+  removalWarningTitle="Remove from this item?"
+  removalWarningDescription={(names) =>
+    `This has already been assigned to ${names.join(", ")}. Remove ${
+      names.length > 1 ? "them" : "this mentee"
+    }? This can't be undone.`
+  }
+  emptyMessage="No teams with mentees found."
+  showSelectAllVisible={isStaffScoped}
+
+/>
           )}
 
           {dispatchMutation.isError && (

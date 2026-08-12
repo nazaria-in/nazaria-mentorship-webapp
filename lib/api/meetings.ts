@@ -271,7 +271,7 @@ export async function fetchInviteCandidates(
     });
   }
 
-  // mentor or mentee: merge both roles across the requester's own team(s),
+  // mentor or mentee: merge both roles across the requester's own team(s) and the pm, assoicates,
   // including empty ones (e.g. requester is the only member so far).
   const [mentorGroups, menteeGroups] = await Promise.all([
     fetchPodMemberGroups({ role: "mentor", mentorId: requesterId, includeEmptyPods: true }),
@@ -307,5 +307,60 @@ export async function fetchInviteCandidates(
     }
   }
 
+  // NEW: staff are always available to invite, shown ungrouped (no podId)
+  // so they land in the picker's "No team" bucket rather than implying
+  // they belong to the requester's pod.
+  const supabase = createClient();
+  const { data: staffRows, error: staffError } = await supabase
+    .from("users")
+    .select("id, full_name, role")
+    .in("role", ["associate", "pm"])
+    .is("deleted_at", null)
+    .neq("id", requesterId)
+    .order("full_name", { ascending: true });
+  if (staffError) throw staffError;
+
+  for (const u of staffRows ?? []) {
+    byId.set(u.id as string, {
+      id: u.id as string,
+      full_name: (u.full_name as string | null)?.trim() || "Unnamed",
+      role: u.role as UserRole,
+      // no podId/podName — falls into NO_TEAM_KEY in the picker
+    });
+  }
+
   return Array.from(byId.values()).sort((a, b) => a.full_name.localeCompare(b.full_name));
+}
+
+export interface UpdateMeetingInput {
+  title?: string;
+  description?: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
+async function patchMeeting(meetingId: string, body: UpdateMeetingInput | { cancel: true }): Promise<void> {
+  const response = await fetch(`/api/meetings/${meetingId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorBody.error ?? "Failed to update meeting");
+  }
+}
+
+/** Edits title/description/time. Server re-checks creator-or-staff + not-yet-started, same as cancel. */
+export async function updateMeeting(meetingId: string, input: UpdateMeetingInput): Promise<void> {
+  return patchMeeting(meetingId, input);
+}
+
+/**
+ * "Delete" is a soft cancel server-side (status: "cancelled", Calendar
+ * event removed) — matches the existing PATCH endpoint's `cancel` flag,
+ * no new endpoint needed.
+ */
+export async function cancelMeeting(meetingId: string): Promise<void> {
+  return patchMeeting(meetingId, { cancel: true });
 }

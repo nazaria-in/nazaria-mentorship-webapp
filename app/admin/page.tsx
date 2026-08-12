@@ -1,4 +1,5 @@
 // app/admin/page.tsx
+
 "use client";
 
 import { Suspense } from "react";
@@ -12,13 +13,14 @@ import { getPodStats, getMentorStats } from "@/lib/api/org-stats";
 import { resolveAdminScope, type AdminScope } from "@/lib/api/admin-scope";
 import { fetchUsersByApproval } from "@/lib/api/users";
 import { createClient } from "@/lib/supabase/client";
-
+import { fetchAnalyticsRollup } from "@/lib/api/content-analytics";
 
 import { UserCardPerson } from "@/components/shared/UserCard";
 import { StatusStrip, type StatusTile } from "@/components/admin/dashboard/StatusStrip";
 import { EscalationDesk } from "@/components/admin/dashboard/EscalationDesk";
 import { PodCompletionSection } from "@/components/admin/dashboard/PodCompletionSection";
 import { MentorCompletionSection } from "@/components/admin/dashboard/MentorCompletionSection";
+import { ContentAnalyticsSection } from "@/components/admin/dashboard/ContentAnalyticsSection";
 import { ExitSurveySignalsSection } from "@/components/admin/dashboard/ExitSurveySignalsSection";
 import { StaffScopeBlock } from "@/components/admin/dashboard/StaffScopeBlock";
 import { AboutMenteeBlock } from "@/components/admin/dashboard/AboutMenteeBlock";
@@ -116,6 +118,12 @@ export function AdminDashboardContent() {
   });
 
   const pendingCount = usePendingApprovalsCount();
+
+  const analyticsRollup = useQuery({
+    queryKey: ["content-analytics-rollup"],
+    enabled: isUnscoped,
+    queryFn: fetchAnalyticsRollup,
+  });
 
   const handleMarkReviewed = async (exitSurveyId: string) => {
     await markEscalationReviewed(exitSurveyId);
@@ -219,7 +227,7 @@ export function AdminDashboardContent() {
         <>
           <section>
             <h2 className="font-heading text-lg font-semibold text-text-primary mb-3 dark:text-text-primary">
-              Teamss at a glance
+              Teams at a glance
             </h2>
             <PodCompletionSection data={podStats.data ?? []} isLoading={podStats.isLoading} />
           </section>
@@ -229,6 +237,13 @@ export function AdminDashboardContent() {
               Mentors at a glance
             </h2>
             <MentorCompletionSection data={mentorStats.data ?? []} isLoading={mentorStats.isLoading} />
+          </section>
+
+          <section>
+            <h2 className="font-heading text-lg font-semibold text-text-primary mb-3 dark:text-text-primary">
+              Content analytics
+            </h2>
+            <ContentAnalyticsSection rollup={analyticsRollup.data ?? []} isLoading={analyticsRollup.isLoading} />
           </section>
         </>
       )}

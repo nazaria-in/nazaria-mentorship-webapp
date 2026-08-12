@@ -22,11 +22,9 @@ export function MentorCompletionSection({ data, isLoading }: { data: MentorStats
     const search = filterState.filterState.search?.trim().toLowerCase();
     return data
       .filter((r) => (search ? (r.mentor_name ?? "").toLowerCase().includes(search) : true))
-      .sort((a, b) => {
-        const aRatio = a.total_assignments > 0 ? a.completed_assignments / a.total_assignments : Infinity;
-        const bRatio = b.total_assignments > 0 ? b.completed_assignments / b.total_assignments : Infinity;
-        return aRatio - bRatio;
-      });
+      .sort((a, b) =>
+        (a.mentor_name ?? "").localeCompare(b.mentor_name ?? "", undefined, { numeric: true, sensitivity: "base" })
+      );
   }, [data, filterState.filterState]);
 
   return (

@@ -301,6 +301,8 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
             onSelectionChange={setSelectedIds}
             emptyMessage="No one matches that search."
             defaultView="list"
+            showSelectAllVisible={role === "pm" || role === "associate"}
+
           />
         )}
       </div>

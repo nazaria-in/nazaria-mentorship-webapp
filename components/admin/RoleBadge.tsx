@@ -11,14 +11,21 @@ const ROLE_STYLES: Record<UserRole, string> = {
   pm: "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground",
 };
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  mentee: "Mentee",
+  mentor: "Mentor",
+  associate: "Associate",
+  pm: "P.M",
+};
+
 interface RoleBadgeProps {
   role: UserRole;
 }
 
 export function RoleBadge({ role }: RoleBadgeProps) {
   return (
-    <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[role]}`}>
-      {role}
+    <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_STYLES[role]}`}>
+      {ROLE_LABELS[role]}
     </span>
   );
 }

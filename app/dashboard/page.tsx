@@ -16,7 +16,6 @@ import { TimelineElementDetailsModal } from "@/components/shared/TimelineElement
 import type { MeetingWithParticipants } from "@/types/meetings";
 import { UpcomingContentWidget } from "@/components/content/UpcomingContentWidget";
 import { AdminDashboardContent } from "../admin/page";
-import ContentAnalyticsPage from "../admin/content-analytics/page";
 
 
 //depreciated
@@ -81,7 +80,6 @@ export default function DashboardPage() {
       {isPmOrAssociate && (
         <Suspense fallback={<p className="p-6 text-text-muted">Loading…</p>}>
           <AdminDashboardContent />
-          <ContentAnalyticsPage />
         </Suspense>
       )}
       <div className="flex flex-col gap-6 p-4 max-w-7xl mx-auto w-full">

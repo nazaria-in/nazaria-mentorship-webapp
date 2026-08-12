@@ -45,6 +45,7 @@ export async function signUp({ fullName, email, password }: SignUpInput) {
       full_name: fullName,
       email: email,
       role: "mentee", // Default role until onboarding changes it.
+      approval_status: "approved",
     });
 
   if (profileError) {

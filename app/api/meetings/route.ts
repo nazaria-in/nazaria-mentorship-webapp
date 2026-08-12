@@ -55,34 +55,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Server-side re-check of invite permissions — the client-side candidate
   // list already scopes this, but this endpoint shouldn't trust an arbitrary
   // participant list from the request body.
-  if (creatorRole === "mentee" || creatorRole === "mentor") {
-    const { data: myPodRows, error: myPodError } = await supabase
-      .from("pod_members")
-      .select("pod_id")
-      .eq("user_id", authUser.id);
+if (creatorRole === "mentee" || creatorRole === "mentor") {
+  const { data: myPodRows, error: myPodError } = await supabase
+    .from("pod_members")
+    .select("pod_id")
+    .eq("user_id", authUser.id);
 
-    if (myPodError) {
-      return NextResponse.json({ error: "Could not verify team membership" }, { status: 400 });
-    }
-
-    const myPodIds = (myPodRows ?? []).map((r) => r.pod_id as string);
-
-    const { data: allowedRows, error: allowedError } = await supabase
-      .from("pod_members")
-      .select("user_id")
-      .in("pod_id", myPodIds);
-
-    if (allowedError) {
-      return NextResponse.json({ error: "Could not verify team members" }, { status: 400 });
-    }
-
-    const allowedIds = new Set((allowedRows ?? []).map((r) => r.user_id as string));
-    const invalid = participantIds.filter((id) => !allowedIds.has(id));
-
-    if (invalid.length > 0) {
-      return NextResponse.json({ error: "You can only invite members of your own team" }, { status: 403 });
-    }
+  if (myPodError) {
+    return NextResponse.json({ error: "Could not verify team membership" }, { status: 400 });
   }
+
+  const myPodIds = (myPodRows ?? []).map((r) => r.pod_id as string);
+
+  const { data: podMemberRows, error: podMemberError } = await supabase
+    .from("pod_members")
+    .select("user_id")
+    .in("pod_id", myPodIds);
+
+  if (podMemberError) {
+    return NextResponse.json({ error: "Could not verify team members" }, { status: 400 });
+  }
+
+  // Staff (associate/pm) are always inviteable by mentors/mentees,
+  // independent of pod membership — mirrors fetchInviteCandidates'
+  // client-side candidate list below, but re-verified server-side since
+  // this endpoint can't trust the request body's participant list.
+  const { data: staffRows, error: staffError } = await supabase
+    .from("users")
+    .select("id")
+    .in("role", ["associate", "pm"])
+    .is("deleted_at", null);
+
+  if (staffError) {
+    return NextResponse.json({ error: "Could not verify staff list" }, { status: 400 });
+  }
+
+  const allowedIds = new Set([
+    ...(podMemberRows ?? []).map((r) => r.user_id as string),
+    ...(staffRows ?? []).map((r) => r.id as string),
+  ]);
+  const invalid = participantIds.filter((id) => !allowedIds.has(id));
+
+  if (invalid.length > 0) {
+    return NextResponse.json({ error: "You can only invite members of your own team or staff" }, { status: 403 });
+  }
+}
 
   const admin = supabaseAdmin;
   const allUserIds = [authUser.id, ...participantIds];

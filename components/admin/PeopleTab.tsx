@@ -214,6 +214,15 @@ export function PeopleTab() {
         emptyMessage="No pending mentor requests."
         roles={["mentor"]}
       />
+      {/* BUG FIX: mentee pending approvals were never rendered — this
+          section was missing entirely, so any pending mentee registrant
+          showed up in the dashboard's "Pending approvals" count but had
+          no UI anywhere to approve/reject them. */}
+      <PendingSection
+        title="Pending — Mentee requests"
+        emptyMessage="No pending mentee requests."
+        roles={["mentee"]}
+      />
       <RejectedSection />
       <ApprovedRoster />
     </div>

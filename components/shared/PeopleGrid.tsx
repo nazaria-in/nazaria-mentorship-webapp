@@ -1,7 +1,8 @@
-// components/shared/PeopleGrid.tsx
+// /components/shared/PeopleGrid.tsx
+
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { List, LayoutGrid } from "lucide-react";
 import { useFilterState } from "@/hooks/use-filter-state";
@@ -21,16 +22,21 @@ export interface PeopleGridProps {
   queryKey: unknown[];
   queryFn: (filterState: FilterState, sortState: SortState) => Promise<UserCardPerson[]>;
   renderActions?: (person: UserCardPerson) => React.ReactNode;
-  groupBy?: "pod" | "none";
+  /**
+   * "pod" and "cohort" both just mean "derive a group label from each
+   * person via groupKeyFn" — PeopleGrid doesn't care what the label
+   * represents. Nesting (cohort containing pods) isn't supported; pick
+   * one grouping level per PeopleGrid instance.
+   */
+  groupBy?: "pod" | "cohort" | "none";
   groupKeyFn?: (person: UserCardPerson) => string;
   /**
    * Full set of groups to render, independent of who's currently fetched
-   * into `data` — e.g. every team including ones with zero members right
-   * now. When provided, every group here always renders (0/0 count is
-   * fine, select-all is simply a no-op via the existing `disabled` guard
-   * below), in the given order. Any fetched person whose groupKeyFn result
-   * isn't in this list falls into a trailing "Other" group so nobody is
-   * silently dropped. Ignored when groupBy is "none".
+   * into `data` — e.g. every cohort/team including ones with zero members
+   * right now. When provided, every group here always renders (0/0 count
+   * is fine, select-all is simply a no-op via the existing `disabled`
+   * guard below). Groups are still sorted ascending by label regardless
+   * of the order given here — pass them in any order.
    */
   explicitGroups?: ExplicitGroup[];
   computeClickable?: (person: UserCardPerson) => boolean;
@@ -38,33 +44,40 @@ export interface PeopleGridProps {
   defaultView?: "list" | "card";
 
   // ---- Picker / selectable mode (replaces PodMemberSelector) ----
-  /** Turns every UserCard into a checkbox row. `renderActions` is ignored
-   *  in this mode — the action slot is reserved for the committed-member
-   *  tag PeopleGrid itself renders. */
   selectable?: boolean;
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
-  /**
-   * IDs already committed elsewhere (e.g. an existing mentee_assignments
-   * row). Unselecting one doesn't call onSelectionChange directly — it
-   * opens a warning modal, and only removes on confirm via
-   * `onRemoveCommitted`. Omit both this and `onRemoveCommitted` for plain
-   * selection (e.g. picking meeting invitees) where nothing is committed.
-   */
   alreadyCommittedIds?: string[];
-  /** Performs the actual removal (e.g. removeMenteeAssignment) after the
-   *  user confirms. Should throw/reject on failure — the modal stays open
-   *  and shows the error instead of closing. Required if
-   *  `alreadyCommittedIds` is passed. */
   onRemoveCommitted?: (id: string) => Promise<void>;
-  /** Blocks removing the last remaining committed member. Default true
-   *  whenever `onRemoveCommitted` is set. */
   preventEmptyCommitted?: boolean;
   removalWarningTitle?: string;
   removalWarningDescription?: (memberNames: string[]) => string;
+  showSelectAllVisible?: boolean;
 }
 
 const OTHER_GROUP_KEY = "__other__";
+/** Natural/numeric alphabetical compare — "Team 2" sorts before "Team 10". */
+function alphaCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/**
+ * Sorts groups ascending by label, but always pushes catch-all buckets
+ * ("Other", "No pod", "No cohort", etc.) to the end — those aren't a real
+ * alphabetical peer of the named groups, they're a leftover bucket.
+ */
+function sortGroupsAscending<T extends { key: string | null; label: string | null }>(groups: T[]): T[] {
+  const isCatchAll = (g: T) => g.key === OTHER_GROUP_KEY || g.label === null;
+  const named = groups.filter((g) => !isCatchAll(g));
+  const catchAll = groups.filter(isCatchAll);
+  named.sort((a, b) => alphaCompare(a.label ?? "", b.label ?? ""));
+  return [...named, ...catchAll];
+}
+
+/** Sorts people within a single group/list by name — the piece that was missing. */
+function sortPeopleAscending(people: UserCardPerson[]): UserCardPerson[] {
+  return [...people].sort((a, b) => alphaCompare(a.fullName ?? "", b.fullName ?? ""));
+}
 
 export function PeopleGrid({
   fieldDefs,
@@ -86,6 +99,7 @@ export function PeopleGrid({
   preventEmptyCommitted = true,
   removalWarningTitle = "Remove from this assignment?",
   removalWarningDescription,
+  showSelectAllVisible
 }: PeopleGridProps) {
   const [view, setView] = useState<"list" | "card">(defaultView);
   const filterState = useFilterState(fieldDefs, viewKey);
@@ -95,9 +109,11 @@ export function PeopleGrid({
     queryFn: () => queryFn(filterState.filterState, filterState.sortState),
   });
 
+  // Derived during render — grouping + sorting is pure from data/props,
+  // no effect needed.
   const groups = useMemo(() => {
     const people = data ?? [];
-    if (groupBy === "none") return [{ key: null, label: null, people }];
+    if (groupBy === "none") return [{ key: null, label: null, people: sortPeopleAscending(people) }];
 
     const keyFn = groupKeyFn ?? (() => "Ungrouped");
 
@@ -112,11 +128,15 @@ export function PeopleGrid({
           otherBucket.push(person);
         }
       }
-      const result = explicitGroups.map((g) => ({ key: g.key, label: g.label, people: buckets.get(g.key) ?? [] }));
+      const result = explicitGroups.map((g) => ({
+        key: g.key,
+        label: g.label,
+        people: sortPeopleAscending(buckets.get(g.key) ?? []),
+      }));
       if (otherBucket.length > 0) {
-        result.push({ key: OTHER_GROUP_KEY, label: "Other", people: otherBucket });
+        result.push({ key: OTHER_GROUP_KEY, label: "Other", people: sortPeopleAscending(otherBucket) });
       }
-      return result;
+      return sortGroupsAscending(result);
     }
 
     const map = new Map<string, UserCardPerson[]>();
@@ -126,10 +146,14 @@ export function PeopleGrid({
       list.push(person);
       map.set(key, list);
     }
-    return Array.from(map.entries()).map(([key, people]) => ({ key, label: key, people }));
+    const result = Array.from(map.entries()).map(([key, people]) => ({
+      key,
+      label: key,
+      people: sortPeopleAscending(people),
+    }));
+    return sortGroupsAscending(result);
   }, [data, groupBy, groupKeyFn, explicitGroups]);
 
-  // ---- Selectable-mode state (ported from PodMemberSelector) ----
   const value = selectedIds ?? [];
   const selectedSet = useMemo(() => new Set(value), [value]);
   const committedSet = useMemo(() => new Set(alreadyCommittedIds ?? []), [alreadyCommittedIds]);
@@ -138,6 +162,25 @@ export function PeopleGrid({
     (id: string) => allPeople.find((p) => p.id === id)?.fullName ?? "this member",
     [allPeople]
   );
+
+  const visibleIds = useMemo(() => (data ?? []).map((p) => p.id), [data]);
+  const visibleSelectedCount = visibleIds.filter((id) => selectedSet.has(id)).length;
+  const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
+
+  function toggleAllVisible() {
+    if (allVisibleSelected) {
+      // Same committed-guard as toggleGroup — don't silently strip committed
+      // members, route them through the same removal confirmation.
+      const committedInVisible = onRemoveCommitted ? visibleIds.filter((id) => committedSet.has(id)) : [];
+      const plainRemovable = visibleIds.filter((id) => !committedInVisible.includes(id));
+      if (plainRemovable.length > 0) onSelectionChange?.(value.filter((id) => !plainRemovable.includes(id)));
+      if (committedInVisible.length > 0) requestRemoval(committedInVisible);
+    } else {
+      const merged = new Set(value);
+      visibleIds.forEach((id) => merged.add(id));
+      onSelectionChange?.(Array.from(merged));
+    }
+  }
 
   const [pendingRemovalIds, setPendingRemovalIds] = useState<string[] | null>(null);
   const [pendingBlocked, setPendingBlocked] = useState(false);
@@ -163,8 +206,12 @@ export function PeopleGrid({
     onSelectionChange?.(isSelected ? value.filter((v) => v !== id) : [...value, id]);
   }
 
+  // Works identically whether memberIds represents a pod or a whole
+  // cohort — "select everyone in this group" is the same operation either
+  // way, which is why cohort-level "select all" doesn't need new logic,
+  // just groupBy="cohort" upstream.
   function toggleGroup(memberIds: string[], allSelected: boolean) {
-    if (memberIds.length === 0) return; // empty team — nothing to toggle
+    if (memberIds.length === 0) return;
     if (allSelected) {
       const committedInGroup = onRemoveCommitted ? memberIds.filter((id) => committedSet.has(id)) : [];
       const plainRemovable = memberIds.filter((id) => !committedInGroup.includes(id));
@@ -226,6 +273,16 @@ export function PeopleGrid({
       )}
       {!isLoading && (data ?? []).length === 0 && !explicitGroups && (
         <p className="text-sm text-text-muted dark:text-text-muted">{emptyMessage}</p>
+      )}
+
+      {selectable && showSelectAllVisible && visibleIds.length > 0 && (
+        <button
+          type="button"
+          onClick={toggleAllVisible}
+          className="w-fit rounded-full border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-card-alt dark:border-border dark:text-text-primary dark:hover:bg-card-alt"
+        >
+          {allVisibleSelected ? "Clear all visible" : `Select all visible (${visibleIds.length})`}
+        </button>
       )}
 
       {groups.map((group) => {

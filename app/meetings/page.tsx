@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // add useQueryClient
 import { Timeline } from "@/components/timeline/Timeline";
 import { MeetingFormModal } from "@/components/meetings/MeetingFormModal";
 import { InPersonSessionFormModal } from "@/components/meetings/InPersonSessionFormModal";
@@ -21,6 +21,7 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import type { TimelineEvent, TimelineEventType } from "@/types/timeline";
 
+
 // Same roles that get the widget on /dashboard — staff get their own
 // org-wide analytics section elsewhere, not this personal list.
 const ROLES_WITH_OWN_PENDING_SURVEYS = ["mentee", "mentor"] as const;
@@ -36,6 +37,7 @@ const AVAILABLE_TYPES: TimelineEventType[] = [
 export default function MeetingsPage(): React.JSX.Element {
   const { role, permissionLevel, isDebug } = useRole();
   const userId = useSessionStore((s) => s.userId) as string | undefined;
+  const queryClient = useQueryClient(); 
 
   const [isMeetingFormOpen, setIsMeetingFormOpen] = React.useState(false);
   const [isSessionFormOpen, setIsSessionFormOpen] = React.useState(false);
@@ -119,14 +121,23 @@ export default function MeetingsPage(): React.JSX.Element {
     );
   }
 
-  const meetingEvents: TimelineEvent[] = userId
-    ? (meetingsQuery.data ?? []).map((meeting) =>
-        meetingToTimelineEvent(meeting, userId, [
-          ["meeting-pending-invites", userId],
-          ["meetings", userId],
-        ]),
-      )
-    : [];
+  const meetingEvents: TimelineEvent[] =
+    userId && role
+      ? (meetingsQuery.data ?? []).map((meeting) =>
+          meetingToTimelineEvent(meeting, {
+            currentUserId: userId,
+            currentUserRole: role,
+            invalidateQueryKeys: [
+              ["meeting-pending-invites", userId],
+              ["meetings", userId],
+            ],
+            onCancelled: () => {
+              void queryClient.invalidateQueries({ queryKey: ["meetings", userId, role, range?.start, range?.end] });
+              void queryClient.invalidateQueries({ queryKey: ["meeting-pending-invites", userId] });
+            },
+          }),
+        )
+      : [];
 
   const sessionEvents: TimelineEvent[] = (inPersonSessionsQuery.data ?? []).map((session) =>
     inPersonSessionToTimelineEvent(session, canManageSessions, [["in-person-sessions", range?.start, range?.end]]),

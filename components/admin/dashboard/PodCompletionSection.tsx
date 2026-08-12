@@ -37,11 +37,7 @@ export function PodCompletionSection({ data, isLoading }: { data: PodStats[]; is
     return data
       .filter((r) => (search ? r.pod_name.toLowerCase().includes(search) : true))
       .filter((r) => (cohortId ? r.cohort_id === cohortId : true))
-      .sort((a, b) => {
-        const aRatio = a.total_assignments > 0 ? a.completed_assignments / a.total_assignments : Infinity;
-        const bRatio = b.total_assignments > 0 ? b.completed_assignments / b.total_assignments : Infinity;
-        return aRatio - bRatio;
-      });
+      .sort((a, b) => a.pod_name.localeCompare(b.pod_name, undefined, { numeric: true, sensitivity: "base" }));
   }, [data, filterState.filterState]);
 
   return (
