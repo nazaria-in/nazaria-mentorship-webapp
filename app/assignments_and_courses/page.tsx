@@ -16,6 +16,8 @@ import { useContentFieldDefs } from "@/lib/filtering/content-fields";
 
 import { fetchContentItems, fetchTags, fetchWeeks, softDeleteContentItem } from "@/lib/api/content-items";
 import { fetchMenteeContentDispatches } from "@/lib/api/content-dispatches";
+import { getMenteeIdsForMentor } from "@/lib/api/pods";
+
 
 import { ContentItemCard } from "@/components/content/ContentItemCard";
 import { MenteeContentCard } from "@/components/content/MenteeContentCard";
@@ -110,17 +112,22 @@ export default function AssignmentsAndCoursesPage() {
   const isStaff = permissionLevel === "staff"; // pm / associate
   const canCreate = permissionLevel === "mentor" || permissionLevel === "staff";
 
-  // Explicit three-way scope, matching the todo's "mentee → own,
-  // mentor → created by them, staff → everything" requirement. Staff
-  // previously got "everything" only as a side effect of scopeToCreatedBy
-  // being undefined for any non-mentor role — same runtime behavior, but
-  // now it says what it means instead of relying on an implicit fallthrough.
-  const scopeToCreatedBy = role === "mentor" ? userId ?? undefined : undefined;
-  const scopeToMentorId = role === "mentor" ? userId ?? undefined : undefined;
+
   // isStaff intentionally applies no scope at all — kept as a named
   // branch (even though it's a no-op today) so a future reviewer doesn't
   // mistake the mentor-only scoping above for "everyone gets scoped".
   void isStaff;
+
+  // Mentors see content they authored OR content dispatched to any mentee
+  // in their pod(s) — see scopeToMentor in fetchContentItems for how the
+  // two conditions are OR'd together server-side.
+  const scopeToMentorId = role === "mentor" ? userId ?? undefined : undefined;
+  const { data: podMenteeIds, isLoading: podMenteeIdsLoading } = useQuery({
+    queryKey: ["pod-mentee-ids", userId],
+    queryFn: () => getMenteeIdsForMentor(userId as string),
+    enabled: role === "mentor" && !!userId,
+  });
+
 
   const { data: weeks } = useQuery({ queryKey: ["weeks"], queryFn: fetchWeeks });
   const { data: tags } = useQuery({ queryKey: ["tags"], queryFn: fetchTags });
@@ -135,16 +142,21 @@ export default function AssignmentsAndCoursesPage() {
   });
 
   const staffQuery = useQuery({
-    queryKey: ["content-items", "list", tab, scopeToCreatedBy, filterState.filterState, filterState.sortState],
+    queryKey: ["content-items", "list", tab, scopeToMentorId, podMenteeIds, filterState.filterState, filterState.sortState],
     queryFn: () =>
       fetchContentItems({
         contentType: tab,
         fieldDefs,
         filterState: filterState.filterState,
         sortState: filterState.sortState,
-        scopeToCreatedBy,
+        scopeToMentor:
+          role === "mentor" && userId ? { mentorId: userId, podMenteeIds: podMenteeIds ?? [] } : undefined,
       }),
-    enabled: !isMentee,
+    // For mentors, wait until pod-mentee ids have resolved before firing —
+    // otherwise the first render would query with podMenteeIds: [] and
+    // briefly show only self-authored items before widening once the pod
+    // lookup returns.
+    enabled: !isMentee && (role !== "mentor" || !podMenteeIdsLoading),
   });
 
   const deleteMutation = useMutation({

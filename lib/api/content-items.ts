@@ -55,8 +55,6 @@ interface FetchContentItemsParams {
   fieldDefs: FilterFieldDef[];
   filterState: FilterState;
   sortState: SortState;
-  /** Mentor management view: only their own authored items. */
-  scopeToCreatedBy?: string;
 }
 
 /**
@@ -81,13 +79,63 @@ function isTagFilterActive(filterState: FilterState): boolean {
   return typeof tagsFilter === "string" && tagsFilter !== "";
 }
 
+// /lib/api/content-items.ts
+
+interface FetchContentItemsParams {
+  contentType: ContentType;
+  fieldDefs: FilterFieldDef[];
+  filterState: FilterState;
+  sortState: SortState;
+  /**
+   * Mentor scope: items either created by this user OR dispatched to at
+   * least one mentee in mentorPodMenteeIds. Both conditions are OR'd
+   * together — a mentor sees their own authored content even if they
+   * haven't dispatched it to a pod mentee yet, plus everything their pod
+   * mentees have been assigned regardless of author.
+   */
+  scopeToMentor?: {
+    mentorId: string;
+    podMenteeIds: string[];
+  };
+}
+
 export async function fetchContentItems({
   contentType,
   fieldDefs,
   filterState,
   sortState,
-  scopeToCreatedBy,
+  scopeToMentor,
 }: FetchContentItemsParams): Promise<ContentItemWithMeta[]> {
+  let dispatchScopedItemIds: string[] = [];
+
+  if (scopeToMentor && scopeToMentor.podMenteeIds.length > 0) {
+    const { data: dispatchRows, error: dispatchError } = await supabase
+      .from("content_dispatches")
+      .select("content_item_id")
+      .in("mentee_id", scopeToMentor.podMenteeIds);
+    if (dispatchError) throw dispatchError;
+
+    dispatchScopedItemIds = Array.from(
+      new Set((dispatchRows ?? []).map((row) => row.content_item_id as string))
+    );
+  }
+
+  // Mentor scope with no pod mentees and nothing they've authored would
+  // otherwise fall through to an unfiltered query (matching everything) —
+  // guard against that explicitly rather than relying on the .or() below
+  // to somehow produce zero rows.
+  if (scopeToMentor && dispatchScopedItemIds.length === 0) {
+    const { data: ownRows, error: ownError } = await supabase
+      .from("content_items")
+      .select("id")
+      .eq("created_by", scopeToMentor.mentorId)
+      .eq("content_type", contentType)
+      .is("deleted_at", null)
+      .limit(1);
+    if (ownError) throw ownError;
+    if ((ownRows ?? []).length === 0) return [];
+  }
+
   const tagsEmbed = isTagFilterActive(filterState)
     ? "content_item_tags!inner(tag:tags(*))"
     : "content_item_tags(tag:tags(*))";
@@ -98,7 +146,10 @@ export async function fetchContentItems({
     .eq("content_type", contentType)
     .is("deleted_at", null);
 
-  if (scopeToCreatedBy) query = query.eq("created_by", scopeToCreatedBy);
+  if (scopeToMentor) {
+    const idFilter = dispatchScopedItemIds.length > 0 ? `id.in.(${dispatchScopedItemIds.join(",")}),` : "";
+    query = query.or(`${idFilter}created_by.eq.${scopeToMentor.mentorId}`);
+  }
 
   query = applyFilters(query, fieldDefs, filterState);
   query = applySort(query, fieldDefs, sortState);
@@ -305,3 +356,5 @@ export const CONTENT_TYPE_LABEL: Record<ContentType, string> = {
   course: "Course",
   resource: "Resource",
 };
+
+

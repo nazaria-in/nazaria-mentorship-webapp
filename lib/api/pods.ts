@@ -132,3 +132,40 @@ export async function fetchAllPodGroupsForRoles(roles: UserRole[]): Promise<PodW
     members: (membersByPod.get(p.id) ?? []).sort((a, b) => a.full_name.localeCompare(b.full_name)),
   }));
 }
+
+
+/**
+ * Every mentee id sitting in any pod this mentor is a member of. Used to
+ * scope the mentor's assignments/courses/resources list to "dispatched to
+ * my mentees" rather than "created by me". Mirrors the mentorId branch in
+ * fetchPodMemberGroups (same pod_members lookup), but flattened to just
+ * ids across all the mentor's pods instead of grouped per-pod.
+ */
+export async function getMenteeIdsForMentor(mentorId: string): Promise<string[]> {
+  const supabase = createClient();
+
+  const { data: mentorPodRows, error: mentorPodError } = await supabase
+    .from("pod_members")
+    .select("pod_id")
+    .eq("user_id", mentorId);
+  if (mentorPodError) throw mentorPodError;
+
+  const podIds = Array.from(new Set((mentorPodRows ?? []).map((r) => r.pod_id as string)));
+  if (podIds.length === 0) return [];
+
+  const { data: memberRows, error: membersError } = await supabase
+    .from("pod_members")
+    .select("user:users!pod_members_user_id_fkey(id, role)")
+    .in("pod_id", podIds);
+  if (membersError) throw membersError;
+
+  const typedRows = (memberRows ?? []) as unknown as { user: { id: string; role: string } | null }[];
+
+  return Array.from(
+    new Set(
+      typedRows
+        .filter((row) => row.user !== null && row.user.role === "mentee")
+        .map((row) => row.user!.id)
+    )
+  );
+}
