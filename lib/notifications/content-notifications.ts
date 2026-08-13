@@ -44,18 +44,18 @@ export async function cancelContentReminders(
 
 export async function notifyContentSubmitted(
   supabase: NotificationsClient,
-  input: { contentDispatchId: string; contentItemTitle: string; mentorId: string; menteeName: string }
+  input: { contentDispatchId: string; contentItemTitle: string; recipientMentorIds: string[]; menteeName: string }
 ): Promise<void> {
+  if (input.recipientMentorIds.length === 0) return;
   await createNotification(supabase, {
     createdBy: null,
     type: "assignment_submitted",
     title: `${input.contentItemTitle} — new submission`,
     body: `${input.menteeName} submitted work for review.`,
-    recipientUserIds: [input.mentorId],
+    recipientUserIds: input.recipientMentorIds,
     contentDispatchId: input.contentDispatchId,
   });
 }
-
 export async function notifyContentReviewed(
   supabase: NotificationsClient,
   input: {

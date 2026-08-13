@@ -43,6 +43,7 @@ import type {
   ContentSubmissionAnswers,
 } from "@/types/content";
 import type { ContentQuestionEntry } from "@/components/content/ContentSubmissionTemplateEditor";
+import { getMentorIdsForMentee } from "@/lib/api/pods";
 
 const TYPE_ICON = { assignment: ClipboardList, course: BookOpen, resource: FileBox } as const;
 
@@ -692,6 +693,11 @@ function MenteeSubmissionForm({
   const [answers, setAnswers] = React.useState<ContentSubmissionAnswers>(
     () => latestAnswers ?? defaultAnswersFor(item)
   );
+  const { data: podMentorIds } = useQuery({
+    queryKey: ["pod-mentor-ids-for-mentee", dispatch.mentee_id],
+    queryFn: () => getMentorIdsForMentee(dispatch.mentee_id),
+  });
+
 
   // WIRED: createSubmission now needs mentorId/menteeName/contentItemTitle
   // to fire notifyContentSubmitted. mentorId = item.created_by (the
@@ -709,7 +715,7 @@ function MenteeSubmissionForm({
         answers,
         priorVersionCount,
         questionDefs: item.submission_template.additional_questions,
-        mentorId: item.created_by,
+        recipientMentorIds: Array.from(new Set([...(podMentorIds ?? []), item.created_by])),
         menteeName: currentUserFullName || "A mentee",
         contentItemTitle: item.title,
       }),

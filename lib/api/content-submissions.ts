@@ -36,39 +36,27 @@ interface CreateSubmissionInput {
   dispatchId: string;
   contentItemId: string;
   answers: ContentSubmissionAnswers;
-  /** Prior submissions for this dispatch, already fetched — avoids a round trip to compute version_number. */
   priorVersionCount: number;
-  /**
-   * The template's additional_questions definitions — needed only to know
-   * which question ids have analyticsEnabled + a metricKey, so their
-   * answers can be denormalized into content_analytics_answers.
-   */
   questionDefs: ContentQuestionEntry[];
   /**
-   * ADDED for notification wiring — mentor to notify (content_items.created_by
-   * is the natural choice: whoever authored the item), the content item's
-   * title for the notification copy, and the submitting mentee's display
-   * name (for the "X submitted work" body). Caller (the mentee-facing
-   * submission form) already has all three in scope.
+   * CHANGED: was a single mentorId (content_items.created_by). Now the
+   * full set of recipients — the mentee's actual pod mentor(s) plus the
+   * content item's creator, deduped by the caller — since visibility and
+   * review access are pod-scoped, not creator-scoped. See
+   * lib/api/pods.ts#getMentorIdsForMentee.
    */
-  mentorId: string;
+  recipientMentorIds: string[];
   menteeName: string;
   contentItemTitle: string;
 }
 
-/**
- * Inserts the next version for a dispatch. Doesn't touch
- * content_dispatches.completed_at — completion is a separate mentor-only
- * action (Mark Complete), independent of any individual submission's
- * review status.
- */
 export async function createSubmission({
   dispatchId,
   contentItemId,
   answers,
   priorVersionCount,
   questionDefs,
-  mentorId,
+  recipientMentorIds,
   menteeName,
   contentItemTitle,
 }: CreateSubmissionInput): Promise<ContentSubmission> {
@@ -91,12 +79,9 @@ export async function createSubmission({
   await notifyContentSubmitted(supabase, {
     contentDispatchId: dispatchId,
     contentItemTitle,
-    mentorId,
+    recipientMentorIds,
     menteeName,
   }).catch((err) => {
-    // Same soft-fail posture as the analytics write below: the submission
-    // itself already succeeded above, a notification hiccup shouldn't
-    // surface as a submission failure to the mentee.
     console.error("[content-submissions] Submission saved but mentor notification failed", dispatchId, err);
   });
 

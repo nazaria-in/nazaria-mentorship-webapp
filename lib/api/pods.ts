@@ -169,3 +169,36 @@ export async function getMenteeIdsForMentor(mentorId: string): Promise<string[]>
     )
   );
 }
+
+/**
+ * The mentor(s) in any pod this mentee belongs to. Used at submission time
+ * to notify the mentee's actual pod mentor(s), not just whoever authored
+ * the content item — those can differ now that mentors see/review pod-wide
+ * content regardless of authorship.
+ */
+export async function getMentorIdsForMentee(menteeId: string): Promise<string[]> {
+  const supabase = createClient();
+
+  const { data: menteePodRows, error: menteePodError } = await supabase
+    .from("pod_members")
+    .select("pod_id")
+    .eq("user_id", menteeId);
+  if (menteePodError) throw menteePodError;
+
+  const podIds = Array.from(new Set((menteePodRows ?? []).map((r) => r.pod_id as string)));
+  if (podIds.length === 0) return [];
+
+  const { data: memberRows, error: membersError } = await supabase
+    .from("pod_members")
+    .select("user:users!pod_members_user_id_fkey(id, role)")
+    .in("pod_id", podIds);
+  if (membersError) throw membersError;
+
+  const typedRows = (memberRows ?? []) as unknown as { user: { id: string; role: string } | null }[];
+
+  return Array.from(
+    new Set(
+      typedRows.filter((row) => row.user !== null && row.user.role === "mentor").map((row) => row.user!.id)
+    )
+  );
+}
