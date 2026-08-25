@@ -353,46 +353,56 @@ function RosterRow({
   );
 
   return (
-    <div className="surface-card-alt flex flex-col gap-2 dark:surface-card-alt">
-      {canExpandReview ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          className="flex w-full items-center justify-between gap-2 rounded-lg text-left transition-colors hover:bg-card dark:hover:bg-card"
-          aria-expanded={expanded}
-        >
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-text-primary dark:text-text-primary">{row.mentee_name}</span>
-            {row.due_at && <span className="text-xs text-text-muted dark:text-text-muted">Due {new Date(row.due_at).toLocaleDateString()}</span>}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}>
-              <StatusIcon className="h-3 w-3" />
-              {status.label}
+    <div
+      onClick={canExpandReview ? () => setExpanded((e) => !e) : undefined}
+      role={canExpandReview ? "button" : undefined}
+      tabIndex={canExpandReview ? 0 : undefined}
+      aria-expanded={canExpandReview ? expanded : undefined}
+      onKeyDown={
+        canExpandReview
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setExpanded((ex) => !ex);
+              }
+            }
+          : undefined
+      }
+      className={`surface-card-alt flex flex-col gap-2 dark:surface-card-alt ${
+        canExpandReview ? "cursor-pointer transition-colors hover:bg-card dark:hover:bg-card" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-text-primary dark:text-text-primary">{row.mentee_name}</span>
+          {row.due_at && (
+            <span className="text-xs text-text-muted dark:text-text-muted">
+              Due {new Date(row.due_at).toLocaleDateString()}
             </span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 text-text-muted transition-transform dark:text-text-muted ${expanded ? "rotate-180" : ""}`}
-            />
-          </div>
-        </button>
-      ) : (
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-text-primary dark:text-text-primary">{row.mentee_name}</span>
-            {row.due_at && <span className="text-xs text-text-muted dark:text-text-muted">Due {new Date(row.due_at).toLocaleDateString()}</span>}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}>
-              <StatusIcon className="h-3 w-3" />
-              {status.label}
-            </span>
-            {markCompleteButton}
-          </div>
+          )}
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}>
+            <StatusIcon className="h-3 w-3" />
+            {status.label}
+          </span>
+          {canExpandReview ? (
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-text-muted transition-transform dark:text-text-muted ${
+                expanded ? "rotate-180" : ""
+              }`}
+            />
+          ) : (
+            markCompleteButton
+          )}
+        </div>
+      </div>
 
       {expanded && canExpandReview && (
-        <div className="flex flex-col gap-3 border-t border-border pt-3 dark:border-border">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex flex-col gap-3 border-t border-border pt-3 dark:border-border"
+        >
           <SubmissionReviewPanel
             dispatchId={row.id}
             menteeId={row.mentee_id}
@@ -420,18 +430,18 @@ function SubmissionReviewPanel({
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = React.useState("");
 
-  const { data: submission, isLoading } = useQuery({
-    queryKey: ["submission-latest", dispatchId],
-    queryFn: () => fetchLatestSubmission(dispatchId),
+  const { data: submissions, isLoading } = useQuery({
+    queryKey: ["submissions-all", dispatchId],
+    queryFn: () => fetchSubmissionsForDispatch(dispatchId),
   });
 
-  // WIRED: reviewSubmission now needs contentDispatchId/menteeId/contentItemTitle
-  // to fire notifyContentReviewed — all threaded down from RosterRow/the
-  // page's roster map, which already has them.
+  const latest = submissions?.[0] ?? null;
+  const olderSubmissions = submissions?.slice(1) ?? [];
+
   const reviewMutation = useMutation({
     mutationFn: (status: "approved" | "revision_requested") =>
       reviewSubmission({
-        submissionId: submission!.id,
+        submissionId: latest!.id,
         status,
         reviewedBy: currentUserId,
         feedback: feedback || null,
@@ -440,28 +450,29 @@ function SubmissionReviewPanel({
         contentItemTitle,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["submission-latest", dispatchId] });
+      queryClient.invalidateQueries({ queryKey: ["submissions-all", dispatchId] });
       queryClient.invalidateQueries({ queryKey: ["content-item-roster-status"] });
     },
   });
 
-  if (isLoading) return <p className="text-xs text-text-muted dark:text-text-muted">Loading submission…</p>;
-  if (!submission) return <p className="text-xs text-text-muted dark:text-text-muted">No submission yet.</p>;
+  if (isLoading) return <p className="text-xs text-text-muted dark:text-text-muted">Loading submissions…</p>;
+  if (!latest) return <p className="text-xs text-text-muted dark:text-text-muted">No submission yet.</p>;
 
   return (
     <div className="flex flex-col gap-3">
+      {/* --- Latest version: reviewable --- */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-text-primary dark:text-text-primary">
-          Version {submission.version_number}
+          Version {latest.version_number} (latest)
         </span>
         <span className="text-[11px] text-text-muted dark:text-text-muted">
-          Submitted {new Date(submission.submitted_at).toLocaleString()}
+          Submitted {new Date(latest.submitted_at).toLocaleString()}
         </span>
       </div>
 
-      <SubmissionAnswersReadout submission={submission} />
+      <SubmissionAnswersReadout submission={latest} />
 
-      {submission.status === "pending_review" ? (
+      {latest.status === "pending_review" ? (
         <div className="flex flex-col gap-2">
           <textarea
             value={feedback}
@@ -491,9 +502,36 @@ function SubmissionReviewPanel({
         </div>
       ) : (
         <p className="text-xs text-text-muted dark:text-text-muted">
-          Already {submission.status === "approved" ? "approved" : "sent back for revision"}
-          {submission.feedback ? ` — "${submission.feedback}"` : ""}.
+          Already {latest.status === "approved" ? "approved" : "sent back for revision"}
+          {latest.feedback ? ` — "${latest.feedback}"` : ""}.
         </p>
+      )}
+
+      {/* --- Older versions: read-only history --- */}
+      {olderSubmissions.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-border pt-3 dark:border-border">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted">
+            Previous versions ({olderSubmissions.length})
+          </span>
+          {olderSubmissions.map((submission) => (
+            <div key={submission.id} className="surface-card-alt flex flex-col gap-2 dark:surface-card-alt">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-primary dark:text-text-primary">
+                  Version {submission.version_number} — {submission.status.replace("_", " ")}
+                </span>
+                <span className="text-[11px] text-text-muted dark:text-text-muted">
+                  {new Date(submission.submitted_at).toLocaleString()}
+                </span>
+              </div>
+              <SubmissionAnswersReadout submission={submission} />
+              {submission.feedback && (
+                <p className="text-xs text-text-primary dark:text-text-primary">
+                  Feedback: &quot;{submission.feedback}&quot;
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
