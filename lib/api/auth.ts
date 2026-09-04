@@ -38,20 +38,6 @@ export async function signUp({ fullName, email, password }: SignUpInput) {
     throw new Error("Failed to create user.");
   }
 
-  const { error: profileError } = await supabase
-    .from("users")
-    .insert({
-      id: data.user.id,
-      full_name: fullName,
-      email: email,
-      role: "mentee", // Default role until onboarding changes it.
-      approval_status: "approved",
-    });
-
-  if (profileError) {
-    throw profileError;
-  }
-
   return data;
 }
 
