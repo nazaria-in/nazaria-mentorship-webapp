@@ -1,4 +1,5 @@
-// components/profile/ProfileEditForm.tsx
+// /components/profile/ProfileEditForm.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserProfile } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
+import { PushNotificationToggle } from "@/components/notifications/PushNotificationToggle";
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30";
@@ -45,9 +47,6 @@ export function ProfileEditForm() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
-  // Profile fields (bio, goals, interests, etc.) don't live in the session
-  // store — only userId/fullName/role do — so load the current row directly
-  // once we have a userId.
   useEffect(() => {
     if (!userId) return;
 
@@ -84,6 +83,7 @@ export function ProfileEditForm() {
     return () => controller.abort();
   }, [userId]);
 
+  // Derived from current field values — no effect needed.
   const canSubmit = fullName.trim().length > 0 && bio.trim().length > 0 && !submitting && !loading;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -117,9 +117,6 @@ export function ProfileEditForm() {
     setSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
-    // Clear proactively rather than waiting for SessionProvider's
-    // onAuthStateChange handler, so the UI doesn't flash stale data
-    // before the redirect completes.
     clearSession();
     router.push("/auth/login");
   }
@@ -141,99 +138,111 @@ export function ProfileEditForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm"
-    >
-      <h1 className="text-lg font-heading text-text-primary">Your profile</h1>
-      {email && <p className="mt-1 text-sm text-muted-foreground">{email}</p>}
+    <div className="w-full max-w-lg space-y-4">
+      {/* ── Profile form ── */}
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-2xl border border-border bg-card p-8 shadow-sm"
+      >
+        <h1 className="text-lg font-heading text-text-primary">Your profile</h1>
+        {email && <p className="mt-1 text-sm text-muted-foreground">{email}</p>}
 
-      <div className="mt-6 space-y-4">
-        <Field label="Full name" htmlFor="fullName">
-          <input
-            id="fullName"
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullNameInput(e.target.value)}
-            className={inputClass}
-            required
-          />
-        </Field>
+        <div className="mt-6 space-y-4">
+          <Field label="Full name" htmlFor="fullName">
+            <input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullNameInput(e.target.value)}
+              className={inputClass}
+              required
+            />
+          </Field>
 
-        <Field label="Bio" htmlFor="bio">
-          <textarea
-            id="bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            className={textareaClass}
-            placeholder="A couple sentences about who you are."
-            required
-          />
-        </Field>
+          <Field label="Bio" htmlFor="bio">
+            <textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className={textareaClass}
+              placeholder="A couple sentences about who you are."
+              required
+            />
+          </Field>
 
-        <Field label="Background" htmlFor="backgroundNotes" optional>
-          <textarea
-            id="backgroundNotes"
-            value={backgroundNotes}
-            onChange={(e) => setBackgroundNotes(e.target.value)}
-            className={textareaClass}
-            placeholder="Relevant experience, skills, or context."
-          />
-        </Field>
+          <Field label="Background" htmlFor="backgroundNotes" optional>
+            <textarea
+              id="backgroundNotes"
+              value={backgroundNotes}
+              onChange={(e) => setBackgroundNotes(e.target.value)}
+              className={textareaClass}
+              placeholder="Relevant experience, skills, or context."
+            />
+          </Field>
 
-        <Field label="School or organization" htmlFor="schoolOrOrg" optional>
-          <input
-            id="schoolOrOrg"
-            type="text"
-            value={schoolOrOrg}
-            onChange={(e) => setSchoolOrOrg(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
+          <Field label="School or organization" htmlFor="schoolOrOrg" optional>
+            <input
+              id="schoolOrOrg"
+              type="text"
+              value={schoolOrOrg}
+              onChange={(e) => setSchoolOrOrg(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
 
-        <Field label="Goals" htmlFor="goals" optional hint="Comma-separated">
-          <input
-            id="goals"
-            type="text"
-            value={goalsInput}
-            onChange={(e) => setGoalsInput(e.target.value)}
-            className={inputClass}
-            placeholder="Learn video editing, build a portfolio"
-          />
-        </Field>
+          <Field label="Goals" htmlFor="goals" optional hint="Comma-separated">
+            <input
+              id="goals"
+              type="text"
+              value={goalsInput}
+              onChange={(e) => setGoalsInput(e.target.value)}
+              className={inputClass}
+              placeholder="Learn video editing, build a portfolio"
+            />
+          </Field>
 
-        <Field label="Interests" htmlFor="interests" optional hint="Comma-separated">
-          <input
-            id="interests"
-            type="text"
-            value={interestsInput}
-            onChange={(e) => setInterestsInput(e.target.value)}
-            className={inputClass}
-            placeholder="Photography, documentary film"
-          />
-        </Field>
+          <Field label="Interests" htmlFor="interests" optional hint="Comma-separated">
+            <input
+              id="interests"
+              type="text"
+              value={interestsInput}
+              onChange={(e) => setInterestsInput(e.target.value)}
+              className={inputClass}
+              placeholder="Photography, documentary film"
+            />
+          </Field>
+        </div>
+
+        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+        {savedAt && !error && <p className="mt-4 text-sm text-text-accent">Saved.</p>}
+
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="mt-6 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {submitting ? "Saving…" : "Save changes"}
+        </button>
+      </form>
+
+      {/* ── Notifications section ── */}
+      <div>
+        <p className="mb-2 px-1 text-sm font-medium text-text-primary dark:text-text-primary">
+          Notifications
+        </p>
+        <PushNotificationToggle />
       </div>
 
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-      {savedAt && !error && <p className="mt-4 text-sm text-text-accent">Saved.</p>}
-
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="mt-6 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {submitting ? "Saving…" : "Save changes"}
-      </button>
-
+      {/* ── Sign out ── */}
       <button
         type="button"
         onClick={() => void handleSignOut()}
         disabled={signingOut}
-        className="mt-3 w-full rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:hover:bg-white/5"
+        className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:hover:bg-white/5"
       >
         {signingOut ? "Signing out…" : "Sign out"}
       </button>
-    </form>
+    </div>
   );
 }
 
@@ -259,11 +268,19 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-text-primary">
+      <label
+        htmlFor={htmlFor}
+        className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-text-primary"
+      >
         <span>
-          {label} {optional && <span className="font-normal text-muted-foreground">(optional)</span>}
+          {label}{" "}
+          {optional && (
+            <span className="font-normal text-muted-foreground">(optional)</span>
+          )}
         </span>
-        {hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}
+        {hint && (
+          <span className="text-xs font-normal text-muted-foreground">{hint}</span>
+        )}
       </label>
       {children}
     </div>

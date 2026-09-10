@@ -14,6 +14,10 @@ import {
   Users,
 } from "lucide-react";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSessionStore } from "@/store/session-store";
+
 interface SocialIconProps {
   className?: string;
 }
@@ -152,8 +156,22 @@ const SIGNALS: { color: string; ring: string; label: string; body: string }[] = 
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
+  const userId = useSessionStore((s) => s.userId);
   const [audience, setAudience] = useState<Audience>("mentee");
   const copy = AUDIENCE_COPY[audience];
+
+  useEffect(() => {
+    if (userId) {
+      router.replace("/dashboard");
+    }
+  }, [userId, router]);
+
+  // Prevent flashing the landing page content if the user is already logged in
+  if (userId) {
+    return null;
+  }
+
 
   return (
     <div className="min-h-screen bg-surface text-text-primary">

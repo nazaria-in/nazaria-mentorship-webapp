@@ -19,7 +19,8 @@ self.addEventListener("push", (event) => {
       icon: "/icon.webp",
       badge: "/icon.webp",
       data: payload.data ?? {},
-      tag: payload.data?.notificationId, // replaces, doesn't stack, if the same id fires twice
+      // replaces, doesn't stack, if the same notificationId fires twice
+      tag: payload.data?.notificationId,
     })
   );
 });
@@ -29,14 +30,36 @@ self.addEventListener("notificationclick", (event) => {
 
   const type = event.notification.data?.type;
   const meetingId = event.notification.data?.meetingId;
-  const menteeAssignmentId = event.notification.data?.menteeAssignmentId;
+  const contentDispatchId = event.notification.data?.contentDispatchId;
+  const exitSurveyId = event.notification.data?.exitSurveyId;
   const conversationId = event.notification.data?.conversationId;
 
   let path = "/dashboard";
-  if (type === "message" && conversationId) path = `/chat/${conversationId}`;
-  else if (type?.startsWith("meeting") || type === "reminder") path = meetingId ? `/meetings?highlight=${meetingId}` : "/meetings";
-  else if (type?.startsWith("assignment")) path = menteeAssignmentId ? `/assignments/${menteeAssignmentId}` : "/assignments";
-  else if (type === "exit_survey_pending") path = meetingId ? `/meetings?highlight=${meetingId}&survey=1` : "/meetings";
+
+  if (type === "message" && conversationId) {
+    path = `/chat/${conversationId}`;
+  } else if (type === "message") {
+    // conversationId is not stored on the notifications table (only message_id
+    // is), so fall back to the chat list rather than a broken deep-link.
+    path = "/chat";
+  } else if (type === "meeting_invite" || type === "meeting_started") {
+    path = meetingId ? `/meetings?highlight=${meetingId}` : "/meetings";
+  } else if (type === "reminder" && meetingId) {
+    path = `/meetings?highlight=${meetingId}`;
+  } else if (type === "reminder" && contentDispatchId) {
+    path = `/assignments_and_courses/dispatch/${contentDispatchId}`;
+  } else if (
+    type === "assignment_due" ||
+    type === "assignment_submitted" ||
+    type === "assignment_reviewed" ||
+    type === "achievement"
+  ) {
+    path = contentDispatchId
+      ? `/assignments_and_courses/dispatch/${contentDispatchId}`
+      : "/assignments_and_courses";
+  } else if (type === "exit_survey_pending") {
+    path = exitSurveyId ? `/exit-survey/${exitSurveyId}` : "/exit-survey";
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clientList) => {
