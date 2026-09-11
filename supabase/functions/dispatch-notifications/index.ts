@@ -70,11 +70,25 @@ interface SubscriptionRow {
 }
 
 Deno.serve(async (req: Request) => {
-  // Auth check must happen INSIDE Deno.serve, after req is available.
-  // The previous version had console.log calls referencing authHeader
-  // before this block, which crashed the function on every invocation.
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${Deno.env.get("SUPABASE_SECRET_KEYS")}`) {
+  let authorized = false;
+
+  try {
+    const secretKeysJson = Deno.env.get("SUPABASE_SECRET_KEYS");
+    if (secretKeysJson) {
+      const keysObj = JSON.parse(secretKeysJson);
+      const validKeys = Object.values(keysObj);
+      authorized = validKeys.some((k) => authHeader === `Bearer ${k}`);
+    }
+  } catch {
+    // Ignore parsing errors and check fallback
+  }
+
+  if (SERVICE_ROLE_KEY && authHeader === `Bearer ${SERVICE_ROLE_KEY}`) {
+    authorized = true;
+  }
+
+  if (!authorized) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -128,12 +142,12 @@ Deno.serve(async (req: Request) => {
     .from("user_notifications")
     .select(
       `notification_id, user_id,
-       notifications!inner(
-         title, body, type,
-         meeting_id, content_dispatch_id,
-         exit_survey_id, message_id,
-         scheduled_for
-       )`
+        notifications!inner(
+          title, body, type,
+          meeting_id, content_dispatch_id,
+          exit_survey_id, message_id,
+          scheduled_for
+        )`
     )
     .eq("status", "pending")
     .is("deleted_at", null)

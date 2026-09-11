@@ -8,9 +8,9 @@
 //
 // SECTIONS
 //   1. Overdue assignments  — content_dispatches that are past due_at and
-//                             not yet completed, using v_mentee_assignment_status.
+//                           not yet completed, using v_mentee_assignment_status.
 //   2. Overdue exit surveys — exit_surveys that are unsubmitted and past
-//                             their meeting's ends_at.
+//                           their meeting's ends_at.
 //
 // REMOVED SECTION (schema no longer exists):
 //   3. Stale resources — previously queried resources_and_courses and
@@ -64,7 +64,24 @@ interface PriorReminderRow {
 
 Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${Deno.env.get("SUPABASE_SECRET_KEYS")}`) {
+  let authorized = false;
+
+  try {
+    const secretKeysJson = Deno.env.get("SUPABASE_SECRET_KEYS");
+    if (secretKeysJson) {
+      const keysObj = JSON.parse(secretKeysJson);
+      const validKeys = Object.values(keysObj);
+      authorized = validKeys.some((k) => authHeader === `Bearer ${k}`);
+    }
+  } catch {
+    // Ignore parsing errors and check fallback
+  }
+
+  if (SERVICE_ROLE_KEY && authHeader === `Bearer ${SERVICE_ROLE_KEY}`) {
+    authorized = true;
+  }
+
+  if (!authorized) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
