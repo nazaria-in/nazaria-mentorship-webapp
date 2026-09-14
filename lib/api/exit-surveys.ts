@@ -28,6 +28,11 @@ const STAFF_SELECT = `*,
  * stored here but never shown back to the submitter — see
  * ExitSurveyReportView's `redacted` prop, which is what actually enforces
  * that (this function has no opinion on visibility, just persistence).
+ *
+ * After saving, notifies all approved staff (pm + associate) via the
+ * standard notifications + user_notifications fan-out so the bell picks
+ * it up. The previous version inserted into `notifications` only — no
+ * `user_notifications` rows were ever created, so nobody saw it.
  */
 export async function submitExitSurvey(submission: ExitSurveySubmission): Promise<ExitSurveyRow> {
   if (!submission.answers.every(isValidExitSurveyEntry)) {
@@ -59,16 +64,62 @@ export async function submitExitSurvey(submission: ExitSurveySubmission): Promis
     throw new Error(updateError?.message ?? "Failed to submit exit survey.");
   }
 
-  const { error: notifyError } = await supabase.from("notifications").insert({
-    type: "exit_survey_pending",
-    title: "Exit survey submitted",
-    body: `${surveyRow.user_role} exit survey submitted — signal: ${submission.signal}`,
-    meeting_id: surveyRow.meeting_id as string,
-    exit_survey_id: surveyRow.id as string,
-  });
+  // Fetch all approved staff to fan the submission alert out to them.
+  // Uses the anon client (RLS allows authenticated users to read users
+  // with role pm/associate — confirmed by the existing is_staff() policy).
+  const { data: staffRows, error: staffError } = await supabase
+    .from("users")
+    .select("id")
+    .in("role", ["pm", "associate"])
+    .eq("approval_status", "approved")
+    .is("deleted_at", null);
 
-  if (notifyError) {
-    throw new Error(`Survey saved, but notifying staff failed: ${notifyError.message}`);
+  if (staffError) {
+    // Don't throw — the survey is already saved. Log and continue.
+    console.error("[exit-surveys] Failed to fetch staff for notification fan-out:", staffError.message);
+    return mapExitSurveyRow(surveyRow);
+  }
+
+  const staffIds = (staffRows ?? []).map((r) => r.id as string);
+
+  if (staffIds.length === 0) {
+    console.warn("[exit-surveys] No approved staff found to notify on survey submission.");
+    return mapExitSurveyRow(surveyRow);
+  }
+
+  // Insert the notification row first, then fan out to user_notifications.
+  const { data: notification, error: notifError } = await supabase
+    .from("notifications")
+    .insert({
+      created_by: surveyRow.user_id as string,
+      type: "exit_survey_pending",
+      title: "Exit survey submitted",
+      body: `${surveyRow.user_role} survey submitted — signal: ${submission.signal}`,
+      meeting_id: surveyRow.meeting_id as string,
+      exit_survey_id: surveyRow.id as string,
+      scheduled_for: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (notifError || !notification) {
+    console.error("[exit-surveys] Failed to create submission notification:", notifError?.message);
+    return mapExitSurveyRow(surveyRow);
+  }
+
+  // Fan out to every staff member — this is what was missing before.
+  const fanOutRows = staffIds.map((userId) => ({
+    notification_id: notification.id as string,
+    user_id: userId,
+    status: "pending" as const,
+  }));
+
+  const { error: fanOutError } = await supabase
+    .from("user_notifications")
+    .insert(fanOutRows);
+
+  if (fanOutError) {
+    console.error("[exit-surveys] Notification created but fan-out failed:", fanOutError.message);
   }
 
   return mapExitSurveyRow(surveyRow);
@@ -172,7 +223,6 @@ export interface PendingExitSurvey {
   startsAt: string;
   endsAt: string;
   meetingStatus: string;
-  /** When this exit_surveys row was created (i.e. when the meeting was created — rows are pre-created, not created on submit). */
   createdAt: string;
 }
 
@@ -199,14 +249,6 @@ export async function fetchPendingExitSurveys(userId: string): Promise<PendingEx
   }));
 }
 
-/**
- * All currently-pending (submitted_at IS NULL, past the 80% threshold)
- * exit surveys for one specific user — used by the staff drill-down (e.g.
- * AboutMenteeBlock/AboutMentorBlock) to list a person's outstanding
- * surveys with their createdAt. Distinct from fetchPendingExitSurveys only
- * in intent/naming — same underlying view and shape, kept as its own
- * export so staff call sites read clearly at the call site.
- */
 export async function fetchPendingExitSurveysForUser(userId: string): Promise<PendingExitSurvey[]> {
   return fetchPendingExitSurveys(userId);
 }
@@ -225,8 +267,6 @@ async function mergeContext(rows: ExitSurveyDetail[]): Promise<ExitSurveyDetail[
     );
 
   if (error) {
-    // Context is supplementary — don't fail the whole fetch if this lookup
-    // errors, just leave pod/mentor fields null.
     console.error("[exit-surveys] Failed to load team/mentor context:", error.message);
     return rows;
   }

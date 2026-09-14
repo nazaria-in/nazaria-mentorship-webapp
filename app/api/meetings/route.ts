@@ -5,14 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createCalendarEvent } from "@/lib/google/calendar-events";
 import type { UserRole } from "@/types/users";
-import type { ExitSurveyTemplateEntry } from "@/types/exit-survey";
 import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning";
-
-
-
 import { notifyMeetingInvite, scheduleMeetingReminders } from "@/lib/notifications/meeting-notifications";
 import { scheduleExitSurveyReminders, scheduleExitSurveyOverdueReminder } from "@/lib/notifications/exit-survey-notifications";
-
 
 interface CreateMeetingRequestBody {
   title: string;
@@ -52,54 +47,48 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const creatorRole = creatorProfile.role as UserRole;
   const participantIds = Array.from(new Set(body.participantUserIds.filter((id) => id !== authUser.id)));
 
-  // Server-side re-check of invite permissions — the client-side candidate
-  // list already scopes this, but this endpoint shouldn't trust an arbitrary
-  // participant list from the request body.
-if (creatorRole === "mentee" || creatorRole === "mentor") {
-  const { data: myPodRows, error: myPodError } = await supabase
-    .from("pod_members")
-    .select("pod_id")
-    .eq("user_id", authUser.id);
+  // Server-side re-check of invite permissions.
+  if (creatorRole === "mentee" || creatorRole === "mentor") {
+    const { data: myPodRows, error: myPodError } = await supabase
+      .from("pod_members")
+      .select("pod_id")
+      .eq("user_id", authUser.id);
 
-  if (myPodError) {
-    return NextResponse.json({ error: "Could not verify team membership" }, { status: 400 });
+    if (myPodError) {
+      return NextResponse.json({ error: "Could not verify team membership" }, { status: 400 });
+    }
+
+    const myPodIds = (myPodRows ?? []).map((r) => r.pod_id as string);
+
+    const { data: podMemberRows, error: podMemberError } = await supabase
+      .from("pod_members")
+      .select("user_id")
+      .in("pod_id", myPodIds);
+
+    if (podMemberError) {
+      return NextResponse.json({ error: "Could not verify team members" }, { status: 400 });
+    }
+
+    const { data: staffRows, error: staffError } = await supabase
+      .from("users")
+      .select("id")
+      .in("role", ["associate", "pm"])
+      .is("deleted_at", null);
+
+    if (staffError) {
+      return NextResponse.json({ error: "Could not verify staff list" }, { status: 400 });
+    }
+
+    const allowedIds = new Set([
+      ...(podMemberRows ?? []).map((r) => r.user_id as string),
+      ...(staffRows ?? []).map((r) => r.id as string),
+    ]);
+    const invalid = participantIds.filter((id) => !allowedIds.has(id));
+
+    if (invalid.length > 0) {
+      return NextResponse.json({ error: "You can only invite members of your own team or staff" }, { status: 403 });
+    }
   }
-
-  const myPodIds = (myPodRows ?? []).map((r) => r.pod_id as string);
-
-  const { data: podMemberRows, error: podMemberError } = await supabase
-    .from("pod_members")
-    .select("user_id")
-    .in("pod_id", myPodIds);
-
-  if (podMemberError) {
-    return NextResponse.json({ error: "Could not verify team members" }, { status: 400 });
-  }
-
-  // Staff (associate/pm) are always inviteable by mentors/mentees,
-  // independent of pod membership — mirrors fetchInviteCandidates'
-  // client-side candidate list below, but re-verified server-side since
-  // this endpoint can't trust the request body's participant list.
-  const { data: staffRows, error: staffError } = await supabase
-    .from("users")
-    .select("id")
-    .in("role", ["associate", "pm"])
-    .is("deleted_at", null);
-
-  if (staffError) {
-    return NextResponse.json({ error: "Could not verify staff list" }, { status: 400 });
-  }
-
-  const allowedIds = new Set([
-    ...(podMemberRows ?? []).map((r) => r.user_id as string),
-    ...(staffRows ?? []).map((r) => r.id as string),
-  ]);
-  const invalid = participantIds.filter((id) => !allowedIds.has(id));
-
-  if (invalid.length > 0) {
-    return NextResponse.json({ error: "You can only invite members of your own team or staff" }, { status: 403 });
-  }
-}
 
   const admin = supabaseAdmin;
   const allUserIds = [authUser.id, ...participantIds];
@@ -179,10 +168,6 @@ if (creatorRole === "mentee" || creatorRole === "mentor") {
     return NextResponse.json({ error: "Meeting created but failed to add participants" }, { status: 500 });
   }
 
-  // --- Meeting invite + reminder cascade notifications ---
-  // Fire-and-continue on failure: the meeting itself is already committed
-  // at this point, and a notification failure shouldn't fail the whole
-  // request. Errors are logged loudly instead.
   const meetingForNotifications = {
     id: meetingId,
     title: meeting.title as string,
@@ -191,6 +176,7 @@ if (creatorRole === "mentee" || creatorRole === "mentor") {
     meet_link: meeting.meet_link as string | null,
   };
 
+  // ── Notifications for invited participants (invite + reminder cascade) ──
   for (const participantId of participantIds) {
     try {
       await notifyMeetingInvite(admin, meetingForNotifications, participantId, authUser.id);
@@ -203,15 +189,20 @@ if (creatorRole === "mentee" || creatorRole === "mentor") {
     }
   }
 
-  // --- Exit survey provisioning ---
-  // Uses the deduped, voice_prompt_label-aware, rowsCreated-returning
-  // implementation from lib/server/exit-survey-provisioning.ts. A previous
-  // version of this file had a SECOND, older copy of this function defined
-  // locally (returning only { warnings }, no rowsCreated) — that stale copy
-  // shadowed this import and silently broke the `result.rowsCreated > 0`
-  // check below, which is why exit-survey reminder notifications were never
-  // scheduled even after exit_surveys rows existed. Do not reintroduce a
-  // local copy of this function here.
+  // ── Reminder cascade for the creator ──────────────────────────────────
+  // The creator is already accepted (no invite needed) but still needs the
+  // time-based reminders (1h before, 1d before, meeting_started). They are
+  // excluded from participantIds above, so we schedule for them separately.
+  try {
+    await scheduleMeetingReminders(admin, meetingForNotifications, authUser.id);
+  } catch (creatorReminderError) {
+    console.error("[meetings] Failed to schedule reminders for creator", creatorReminderError, {
+      meetingId,
+      creatorId: authUser.id,
+    });
+  }
+
+  // ── Exit survey provisioning ───────────────────────────────────────────
   let exitSurveyWarnings: string[] = [];
   try {
     const result = await createPendingExitSurveys(meetingId, allUserIds);
@@ -227,9 +218,7 @@ if (creatorRole === "mentee" || creatorRole === "mentor") {
         .eq("meeting_id", meetingId);
 
       if (createdSurveyRowsError) {
-        console.error("[meetings] Failed to load created exit survey rows for reminder scheduling", createdSurveyRowsError, {
-          meetingId,
-        });
+        console.error("[meetings] Failed to load created exit survey rows for reminder scheduling", createdSurveyRowsError, { meetingId });
       } else if (createdSurveyRows && createdSurveyRows.length > 0) {
         const pendingRows = createdSurveyRows.map((row) => ({
           exitSurveyId: row.id as string,
@@ -242,9 +231,6 @@ if (creatorRole === "mentee" || creatorRole === "mentor") {
           endsAt: meeting.ends_at as string,
         });
 
-        // ADDED: overdue nudge, fired once per row at meeting ends_at.
-        // Same fire-and-continue posture as the reminder above — one
-        // row's failure shouldn't block the others or the response.
         for (const row of pendingRows) {
           try {
             await scheduleExitSurveyOverdueReminder(admin, row, meeting.ends_at as string);

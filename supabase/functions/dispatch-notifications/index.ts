@@ -204,10 +204,11 @@ Deno.serve(async (req: Request) => {
 
     for (const sub of subscriptions) {
       try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        );
+await webpush.sendNotification(
+  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+  payload,
+  { TTL: 60 * 60 * 24 } // 24 hours — FCM will retry delivery for up to 24h
+);
         atLeastOneSuccess = true;
       } catch (err: unknown) {
         const statusCode = (err as { statusCode?: number }).statusCode;

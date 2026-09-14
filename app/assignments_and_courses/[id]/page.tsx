@@ -623,7 +623,7 @@ function MySubmissionSection({
   const revisionLimitReached = maxRevisions !== null && submissions.length >= maxRevisions;
   const isPendingReview = latest?.status === "pending_review";
   const isMarkedComplete = !!dispatch.completed_at;
-  const canSubmit = !isMarkedComplete && !revisionLimitReached && !isPendingReview;
+  const canSubmit = !isMarkedComplete && !revisionLimitReached;
 
   return (
     <section className="surface-card flex flex-col gap-4 dark:surface-card">
@@ -666,11 +666,12 @@ function MySubmissionSection({
               You&apos;ve used all {maxRevisions} allowed submissions for this assignment.
             </p>
           )}
-          {isPendingReview && !revisionLimitReached && (
-            <p className="text-xs text-text-muted dark:text-text-muted">
-              Your latest submission is waiting on review — you can submit a new version once it&apos;s reviewed.
-            </p>
-          )}
+{isPendingReview && (
+  <p className="text-xs text-text-muted dark:text-text-muted">
+    Your latest submission is waiting on review —
+    You can still submit a new version below.
+  </p>
+)}
         </>
       )}
 
