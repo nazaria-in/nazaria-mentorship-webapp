@@ -24,8 +24,8 @@ export async function scheduleContentReminders(
   await createNotification(supabase, {
     createdBy: null,
     type: "assignment_due",
-    title: `${input.contentItemTitle} — new item assigned`,
-    body: "You have a new item available.",
+    title: `${input.contentItemTitle} — new Assigment assigned`,
+    body: "You have a new Assigment available.",
     recipientUserIds: [input.menteeId],
     scheduledFor: new Date(),
     contentDispatchId: input.contentDispatchId,

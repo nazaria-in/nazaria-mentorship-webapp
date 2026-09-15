@@ -4,19 +4,17 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Modal } from "@/components/shared/Modal";
-import { PeopleGrid, type ExplicitGroup } from "@/components/shared/PeopleGrid";
 import type { UserCardPerson } from "@/components/shared/UserCard";
 import { fetchInviteCandidates } from "@/lib/api/meetings";
 import { useRole } from "@/providers/role-provider";
 import type { CreateMeetingInput, InviteCandidate } from "@/types/meetings";
-import type { FilterFieldDef } from "@/lib/filtering/types";
 
 export interface MeetingFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserId: string;
-  /** ISO string to prefill start time, e.g. when the user clicked an empty timeline slot. */
   initialStartsAt?: string;
 }
 
@@ -40,12 +38,10 @@ async function createMeetingRequest(input: CreateMeetingInput): Promise<CreateMe
       participantUserIds: input.participantUserIds,
     }),
   });
-
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as CreateMeetingErrorBody;
     throw new Error(errorBody.error ?? "Failed to create meeting");
   }
-
   return (await response.json()) as CreateMeetingResponse;
 }
 
@@ -56,14 +52,12 @@ function toLocalInputValue(iso: string | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
-interface CandidatePerson extends UserCardPerson {
+interface CandidateWithPod extends UserCardPerson {
   podId?: string;
   podName?: string;
 }
 
-const NO_TEAM_KEY = "__no_team__";
-
-function toCandidatePerson(candidate: InviteCandidate): CandidatePerson {
+function toCandidatePerson(candidate: InviteCandidate): CandidateWithPod {
   return {
     id: candidate.id,
     fullName: candidate.full_name,
@@ -74,19 +68,6 @@ function toCandidatePerson(candidate: InviteCandidate): CandidatePerson {
   };
 }
 
-const INVITE_FIELD_DEFS: FilterFieldDef[] = [
-  { key: "search", kind: "text", columns: ["full_name"], searchable: true },
-];
-
-/**
- * Wrapper just owns the Modal chrome. The actual form (MeetingFormFields)
- * only mounts while isOpen is true — that mount/unmount cycle is what
- * resets the form on every reopen, via each useState's lazy initializer.
- * No "reset via useEffect(() => setX(...), [isOpen])" needed — React flags
- * that pattern as an anti-pattern (setState-in-effect causing an extra
- * cascading render), and this sidesteps it entirely rather than suppressing
- * the warning.
- */
 export function MeetingFormModal({
   isOpen,
   onClose,
@@ -96,7 +77,11 @@ export function MeetingFormModal({
   return (
     <Modal open={isOpen} onClose={onClose} title="Schedule a meeting">
       {isOpen && (
-        <MeetingFormFields currentUserId={currentUserId} initialStartsAt={initialStartsAt} onClose={onClose} />
+        <MeetingFormFields
+          currentUserId={currentUserId}
+          initialStartsAt={initialStartsAt}
+          onClose={onClose}
+        />
       )}
     </Modal>
   );
@@ -108,7 +93,11 @@ interface MeetingFormFieldsProps {
   onClose: () => void;
 }
 
-function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingFormFieldsProps): React.JSX.Element {
+function MeetingFormFields({
+  currentUserId,
+  initialStartsAt,
+  onClose,
+}: MeetingFormFieldsProps): React.JSX.Element {
   const { role } = useRole();
   const queryClient = useQueryClient();
 
@@ -121,61 +110,118 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
     return toLocalInputValue(base.toISOString());
   });
   const [mountTime] = React.useState(() => Date.now());
-
-  // This is pure during render because `mountTime` never changes after the initial render
-  const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mountTime;
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState("");
+  // Track which team sections are collapsed — all start collapsed.
+  const [collapsedTeams, setCollapsedTeams] = React.useState<Set<string>>(new Set());
+  const [allCollapsed, setAllCollapsed] = React.useState(true);
 
-  // Floor for the "Starts" picker — can't schedule a meeting in the past.
-  // Recomputed on every render on purpose (cheap, and "now" moving forward
-  // while the modal sits open is the correct behavior, not a bug).
+  const isStartInFuture = startsAt !== "" && new Date(startsAt).getTime() >= mountTime;
   const minStartsAt = toLocalInputValue(new Date().toISOString());
 
-  // Derived during render — no effect needed.
   const isRangeValid = React.useMemo(() => {
-    if (!startsAt || !endsAt) return true; // let `required` handle empty fields
+    if (!startsAt || !endsAt) return true;
     return new Date(startsAt).getTime() < new Date(endsAt).getTime();
   }, [startsAt, endsAt]);
 
-  // `role` is `Role | null` while the session is still resolving. Rather
-  // than cast past the null, gate the query on role being resolved so
-  // queryFn is never actually invoked with null — no cast needed to
-  // satisfy fetchInviteCandidates' parameter type.
   const candidatesQuery = useQuery({
     queryKey: ["meeting-invite-candidates", currentUserId, role],
     queryFn: () => {
-      if (!role) {
-        return Promise.reject(new Error("Role not loaded yet"));
-      }
+      if (!role) throw new Error("Role not loaded yet");
       return fetchInviteCandidates(currentUserId, role);
     },
     enabled: role !== null,
   });
 
-  const candidatePeople = React.useMemo(
+  const allCandidates: CandidateWithPod[] = React.useMemo(
     () => (candidatesQuery.data ?? []).map(toCandidatePerson),
     [candidatesQuery.data]
   );
 
-  // Real team groups derived from the candidates themselves (podId/podName
-  // now come from fetchInviteCandidates, not a hopeful cast). A "No team"
-  // group is appended for anyone without a podId, but only if such people
-  // exist — an all-team-affiliated org shouldn't show a permanent empty
-  // "No team" bucket.
-  const teamGroups: ExplicitGroup[] = React.useMemo(() => {
-    const seen = new Map<string, string>();
-    let hasUnaffiliated = false;
-    for (const p of candidatePeople) {
-      if (p.podId) {
-        if (!seen.has(p.podId)) seen.set(p.podId, p.podName ?? p.podId);
-      } else {
-        hasUnaffiliated = true;
+  // Build team groups once from candidates.
+  const teamGroups: { key: string; label: string; members: CandidateWithPod[] }[] =
+    React.useMemo(() => {
+      const map = new Map<string, { label: string; members: CandidateWithPod[] }>();
+      const ungrouped: CandidateWithPod[] = [];
+
+      for (const c of allCandidates) {
+        if (c.podId) {
+          const existing = map.get(c.podId);
+          if (existing) {
+            existing.members.push(c);
+          } else {
+            map.set(c.podId, { label: c.podName ?? c.podId, members: [c] });
+          }
+        } else {
+          ungrouped.push(c);
+        }
       }
+
+      const groups = Array.from(map.entries())
+        .map(([key, val]) => ({ key, label: val.label, members: val.members }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+
+      if (ungrouped.length > 0) {
+        groups.push({ key: "__no_team__", label: "No team", members: ungrouped });
+      }
+
+      return groups;
+    }, [allCandidates]);
+
+  // Initialise all teams as collapsed on first load.
+  React.useEffect(() => {
+    if (teamGroups.length > 0 && collapsedTeams.size === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCollapsedTeams(new Set(teamGroups.map((g) => g.key)));
     }
-    const groups: ExplicitGroup[] = Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
-    if (hasUnaffiliated) groups.push({ key: NO_TEAM_KEY, label: "No team" });
-    return groups;
-  }, [candidatePeople]);
+  }, [teamGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Filtered list for search — flat, no grouping.
+  const searchResults: CandidateWithPod[] = React.useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return [];
+    return allCandidates.filter((c) =>
+      (c.fullName ?? "").toLowerCase().includes(term)
+    );
+  }, [searchTerm, allCandidates]);
+
+  const isSearching = searchTerm.trim().length > 0;
+
+  function toggleTeam(key: string) {
+    setCollapsedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAllTeams() {
+    if (allCollapsed) {
+      setCollapsedTeams(new Set());
+      setAllCollapsed(false);
+    } else {
+      setCollapsedTeams(new Set(teamGroups.map((g) => g.key)));
+      setAllCollapsed(true);
+    }
+  }
+
+  function toggleMember(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
+    );
+  }
+
+  function toggleGroupAll(memberIds: string[], allSelected: boolean) {
+    if (memberIds.length === 0) return;
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !memberIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...memberIds])));
+    }
+  }
+
+  const selectedSet = new Set(selectedIds);
 
   const mutation = useMutation({
     mutationFn: createMeetingRequest,
@@ -188,7 +234,6 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
     if (!title.trim() || selectedIds.length === 0 || !isRangeValid || !isStartInFuture) return;
-
     mutation.mutate({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -200,8 +245,12 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {/* Title */}
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-text-primary dark:text-text-primary" htmlFor="meeting-title">
+        <label
+          className="text-sm font-medium text-text-primary dark:text-text-primary"
+          htmlFor="meeting-title"
+        >
           Title
         </label>
         <input
@@ -215,9 +264,14 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
         />
       </div>
 
+      {/* Description */}
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-text-primary dark:text-text-primary" htmlFor="meeting-description">
-          Description <span className="text-text-primary/50 dark:text-text-primary/50">(optional)</span>
+        <label
+          className="text-sm font-medium text-text-primary dark:text-text-primary"
+          htmlFor="meeting-description"
+        >
+          Description{" "}
+          <span className="text-text-primary/50 dark:text-text-primary/50">(optional)</span>
         </label>
         <textarea
           id="meeting-description"
@@ -229,9 +283,13 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
         />
       </div>
 
+      {/* Time range */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex flex-1 flex-col gap-1">
-          <label className="text-sm font-medium text-text-primary dark:text-text-primary" htmlFor="meeting-starts">
+          <label
+            className="text-sm font-medium text-text-primary dark:text-text-primary"
+            htmlFor="meeting-starts"
+          >
             Starts
           </label>
           <input
@@ -242,11 +300,14 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
             onChange={(e) => setStartsAt(e.target.value)}
             required
             aria-invalid={!isStartInFuture}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary aria-[invalid=true]:border-destructive dark:border-border dark:bg-surface dark:text-text-primary dark:aria-[invalid=true]:border-destructive"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary aria-[invalid=true]:border-destructive dark:border-border dark:bg-surface dark:text-text-primary"
           />
         </div>
         <div className="flex flex-1 flex-col gap-1">
-          <label className="text-sm font-medium text-text-primary dark:text-text-primary" htmlFor="meeting-ends">
+          <label
+            className="text-sm font-medium text-text-primary dark:text-text-primary"
+            htmlFor="meeting-ends"
+          >
             Ends
           </label>
           <input
@@ -257,58 +318,180 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
             required
             min={startsAt || undefined}
             aria-invalid={!isRangeValid}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary aria-[invalid=true]:border-destructive dark:border-border dark:bg-surface dark:text-text-primary dark:aria-[invalid=true]:border-destructive"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary aria-[invalid=true]:border-destructive dark:border-border dark:bg-surface dark:text-text-primary"
           />
         </div>
       </div>
 
       {!isStartInFuture && (
-        <p className="text-sm text-destructive dark:text-destructive">Start time can&apos;t be in the past.</p>
+        <p className="text-sm text-destructive">Start time can&apos;t be in the past.</p>
       )}
       {!isRangeValid && (
-        <p className="text-sm text-destructive dark:text-destructive">End time must be after the start time.</p>
+        <p className="text-sm text-destructive">End time must be after the start time.</p>
       )}
 
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-text-primary dark:text-text-primary">Invite</span>
-        {/*
-          explicitGroups carries every team the candidate pool touches
-          (built from real podId/podName on each candidate, not a cast),
-          so a team with zero OTHER members still shows up with a working
-          — if inert — select-all. groupKeyFn falls back to NO_TEAM_KEY for
-          anyone without a podId; PeopleGrid buckets any stragglers whose
-          key isn't in explicitGroups into a trailing "Other" group, so
-          nobody silently disappears if the two ever drift.
-        */}
-        {candidatesQuery.isLoading ? (
-          <p className="text-sm text-text-muted dark:text-text-muted">Loading people…</p>
-        ) : (
-          <PeopleGrid
-            fieldDefs={INVITE_FIELD_DEFS}
-            viewKey="meeting-invite-participants"
-            queryKey={["meeting-invite-candidates-picker", candidatesQuery.dataUpdatedAt]}
-            queryFn={async (filterState) => {
-              const term = filterState.search?.trim().toLowerCase();
-              return term
-                ? candidatePeople.filter((p) => (p.fullName ?? "").toLowerCase().includes(term))
-                : candidatePeople;
-            }}
-            groupBy="pod"
-            groupKeyFn={(p) => (p as CandidatePerson).podId ?? NO_TEAM_KEY}
-            explicitGroups={teamGroups}
-            selectable
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            emptyMessage="No one matches that search."
-            defaultView="list"
-            showSelectAllVisible={role === "pm" || role === "associate"}
+      {/* ── Participant picker ──────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-text-primary dark:text-text-primary">
+            Invite
+            {selectedIds.length > 0 && (
+              <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+                {selectedIds.length}
+              </span>
+            )}
+          </span>
+          {!isSearching && teamGroups.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleAllTeams}
+              className="text-xs font-medium text-text-accent hover:underline"
+            >
+              {allCollapsed ? "Expand all" : "Collapse all"}
+            </button>
+          )}
+        </div>
 
-          />
+        {/* Search */}
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search people…"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted dark:border-border dark:bg-white/5 dark:text-text-primary"
+        />
+
+        {/* Selected chips */}
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedIds.map((id) => {
+              const person = allCandidates.find((c) => c.id === id);
+              if (!person) return null;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-card-alt px-2.5 py-1 text-xs font-medium text-text-primary dark:border-white/10 dark:bg-white/5"
+                >
+                  {person.fullName ?? "Unnamed"}
+                  <button
+                    type="button"
+                    onClick={() => toggleMember(id)}
+                    aria-label={`Remove ${person.fullName}`}
+                    className="ml-0.5 text-text-muted hover:text-destructive"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {candidatesQuery.isLoading ? (
+          <p className="text-sm text-text-muted">Loading people…</p>
+        ) : (
+          /* Fixed-height scrollable container — doesn't push the whole
+             modal into an infinite scroll */
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-border dark:border-white/10">
+            {isSearching ? (
+              /* Flat search results — no team grouping, team shown as chip */
+              <div className="flex flex-col divide-y divide-border dark:divide-white/10">
+                {searchResults.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-sm text-text-muted">
+                    No one matches that search.
+                  </p>
+                ) : (
+                  searchResults.map((person) => (
+                    <PersonRow
+                      key={person.id}
+                      person={person}
+                      selected={selectedSet.has(person.id)}
+                      onToggle={() => toggleMember(person.id)}
+                      showTeamChip
+                    />
+                  ))
+                )}
+              </div>
+            ) : (
+              /* Grouped by team — each team collapsible */
+              <div className="flex flex-col divide-y divide-border dark:divide-white/10">
+                {teamGroups.map((group) => {
+                  const memberIds = group.members.map((m) => m.id);
+                  const selectedCount = memberIds.filter((id) => selectedSet.has(id)).length;
+                  const allSelected =
+                    memberIds.length > 0 && selectedCount === memberIds.length;
+                  const someSelected = selectedCount > 0 && !allSelected;
+                  const isCollapsed = collapsedTeams.has(group.key);
+
+                  return (
+                    <div key={group.key}>
+                      {/* Team header row */}
+                      <div className="flex items-center gap-2 bg-card px-3 py-2 dark:bg-card">
+                        {/* Expand/collapse toggle */}
+                        <button
+                          type="button"
+                          onClick={() => toggleTeam(group.key)}
+                          aria-label={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-muted hover:text-text-primary"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight size={14} />
+                          ) : (
+                            <ChevronDown size={14} />
+                          )}
+                        </button>
+
+                        {/* Select-all checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected;
+                          }}
+                          onChange={() => toggleGroupAll(memberIds, allSelected)}
+                          disabled={memberIds.length === 0}
+                          className="h-3.5 w-3.5 accent-[var(--color-nazaria-burgundy)]"
+                          aria-label={`Select all in ${group.label}`}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => toggleTeam(group.key)}
+                          className="flex-1 text-left text-sm font-semibold text-text-muted dark:text-text-muted"
+                        >
+                          {group.label}
+                        </button>
+
+                        <span className="shrink-0 text-xs text-text-muted">
+                          {selectedCount}/{memberIds.length}
+                        </span>
+                      </div>
+
+                      {/* Members — hidden when collapsed */}
+                      {!isCollapsed && (
+                        <div className="flex flex-col divide-y divide-border dark:divide-white/10">
+                          {group.members.map((person) => (
+                            <PersonRow
+                              key={person.id}
+                              person={person}
+                              selected={selectedSet.has(person.id)}
+                              onToggle={() => toggleMember(person.id)}
+                              indented
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
       {mutation.isError && (
-        <p className="text-sm text-destructive dark:text-destructive">{(mutation.error as Error).message}</p>
+        <p className="text-sm text-destructive">{(mutation.error as Error).message}</p>
       )}
 
       <div className="flex justify-end gap-2">
@@ -334,5 +517,52 @@ function MeetingFormFields({ currentUserId, initialStartsAt, onClose }: MeetingF
         </button>
       </div>
     </form>
+  );
+}
+
+// ── PersonRow ─────────────────────────────────────────────────────────────
+// Lightweight inline component — avoids importing the full UserCard which
+// carries selection/committed logic not needed here, and keeps the meeting
+// form's participant picker self-contained.
+
+interface PersonRowProps {
+  person: CandidateWithPod;
+  selected: boolean;
+  onToggle: () => void;
+  indented?: boolean;
+  showTeamChip?: boolean;
+}
+
+function PersonRow({ person, selected, onToggle, indented, showTeamChip }: PersonRowProps) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-card-alt dark:hover:bg-white/5 ${
+        indented ? "pl-10" : ""
+      } ${selected ? "bg-primary/5 dark:bg-primary/10" : ""}`}
+    >
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        className="h-3.5 w-3.5 shrink-0 accent-[var(--color-nazaria-burgundy)]"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-text-primary dark:text-text-primary">
+          {person.fullName ?? "Unnamed"}
+        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          {person.role && (
+            <span className="text-xs capitalize text-text-muted dark:text-text-muted">
+              {person.role}
+            </span>
+          )}
+          {showTeamChip && person.podName && (
+            <span className="rounded-full border border-border bg-card-alt px-1.5 py-0.5 text-[10px] font-medium text-text-muted dark:border-white/10 dark:bg-white/5">
+              {person.podName}
+            </span>
+          )}
+        </div>
+      </div>
+    </label>
   );
 }

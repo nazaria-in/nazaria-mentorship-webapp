@@ -149,14 +149,6 @@ function MeetingActions({
             Edit
           </button>
         )}
-        <button
-          type="button"
-          onClick={handleCancel}
-          disabled={isCancelling}
-          className="rounded-lg border border-destructive px-4 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50 dark:border-destructive dark:text-destructive dark:hover:bg-destructive/10"
-        >
-          {isCancelling ? "Cancelling…" : "Cancel meeting"}
-        </button>
       </div>
       {cancelError && <p className="text-xs text-destructive dark:text-destructive">{cancelError}</p>}
     </div>

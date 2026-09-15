@@ -17,21 +17,21 @@ import type { PermissionLevel } from "@/providers/role-provider";
 export const NAV_BY_PERMISSION: Record<PermissionLevel, NavItem[]> = {
   mentee: [
     { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-    { id: "assignments_and_courses", label: "Assignments and Courses", href: "/assignments_and_courses", icon: ClipboardCheck },
+    { id: "assignments_and_courses", label: "Assignments", href: "/assignments_and_courses", icon: ClipboardCheck },
     { id: "meetings", label: "Meetings", href: "/meetings", icon: CalendarDays },
     { id: "exit-surveys", label: "Exit Surveys", href: "/exit-survey", icon: ListChecks },
   ],
 
   mentor: [
     { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-    { id: "assignments_and_courses", label: "Assignments and Courses", href: "/assignments_and_courses", icon: ClipboardCheck },
+    { id: "assignments_and_courses", label: "Assignments", href: "/assignments_and_courses", icon: ClipboardCheck },
     { id: "meetings", label: "Meetings", href: "/meetings", icon: CalendarDays },
     { id: "exit-surveys", label: "Exit Surveys", href: "/exit-survey", icon: ListChecks },
   ],
 
   staff: [
     { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-    { id: "assignments_and_courses", label: "Assignments and Courses", href: "/assignments_and_courses", icon: ClipboardCheck },
+    { id: "assignments_and_courses", label: "Assignments", href: "/assignments_and_courses", icon: ClipboardCheck },
     { id: "meetings", label: "Meetings", href: "/meetings", icon: CalendarDays },
     { id: "exit-surveys", label: "Exit Surveys", href: "/exit-survey", icon: ListChecks },
     { id: "people", label: "People", href: "/admin/users", icon: Users },

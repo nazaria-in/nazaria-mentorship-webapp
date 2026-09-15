@@ -50,10 +50,12 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
       const supabase = createClient();
       console.log(`[NotificationBell] loadNotifications called — reason: ${reason}`);
       const rows = await fetchNotificationsForUser(supabase, { userId, limit: 30 });
-      console.log(
-        "[NotificationBell] setNotifications with",
-        rows.map((r) => ({ id: r.id, title: r.title, scheduled_for: r.scheduled_for }))
-      );
+      
+      // console.log(
+      //   "[NotificationBell] setNotifications with",
+      //   rows.map((r) => ({ id: r.id, title: r.title, scheduled_for: r.scheduled_for }))
+      // );
+      
       setNotifications(rows);
     } finally {
       setIsLoading(false);
@@ -158,6 +160,14 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Remove a deleted card from local state immediately — no refetch needed.
+  function handleCardDelete(userNotificationId: string): void {
+    setNotifications((prev) =>
+      prev.filter((n) => n.userNotificationId !== userNotificationId)
+    );
+    void refreshUnreadCount();
+  }
+
   const filteredNotifications = notifications.filter((n) => {
     if (quickFilter === "unread") return n.readAt === null;
     const allowedTypes = QUICK_FILTER_TYPES[quickFilter];
@@ -171,16 +181,17 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
   // state is being mutated by something other than loadNotifications
   // (search the codebase for any other setNotifications( call on this
   // component, or a parent forcing a remount with stale initial state).
-  console.log(
-    `[NotificationBell] RENDERING ${filteredNotifications.length} card(s) (quickFilter=${quickFilter})`,
-    filteredNotifications.map((n) => ({
-      id: n.id,
-      userNotificationId: n.userNotificationId,
-      type: n.type,
-      title: n.title,
-      scheduled_for: n.scheduled_for,
-    }))
-  );
+  //
+  // console.log(
+  //   `[NotificationBell] RENDERING ${filteredNotifications.length} card(s) (quickFilter=${quickFilter})`,
+  //   filteredNotifications.map((n) => ({
+  //     id: n.id,
+  //     userNotificationId: n.userNotificationId,
+  //     type: n.type,
+  //     title: n.title,
+  //     scheduled_for: n.scheduled_for,
+  //   }))
+  // );
 
   async function handleMarkAllRead(): Promise<void> {
     if (!userId) return;
@@ -193,7 +204,7 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
 
   function handleCardRead(): void {
     void refreshUnreadCount();
-    void loadNotifications("card read");
+    // void loadNotifications("card read"); // Removed to prevent full reload on read (Optimization)
   }
 
   if (!userId) {
@@ -262,13 +273,23 @@ export function NotificationBell({ userId }: NotificationBellProps): React.JSX.E
               <EmptyState title="No notifications" description="You're all caught up." />
             ) : (
               filteredNotifications.map((n) => (
-                <NotificationCard key={n.userNotificationId} notification={n} dense onRead={handleCardRead} />
+                <NotificationCard
+                  key={n.userNotificationId}
+                  notification={n}
+                  dense
+                  onRead={handleCardRead}
+                  onDelete={handleCardDelete}
+                />
               ))
             )}
           </div>
 
           <div className="border-t border-border p-2 text-center dark:border-white/10">
-            <Link href="/notifications" className="text-xs font-medium text-text-accent hover:underline" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/notifications"
+              className="text-xs font-medium text-text-accent hover:underline"
+              onClick={() => setIsOpen(false)}
+            >
               View all
             </Link>
           </div>
