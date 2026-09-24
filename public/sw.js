@@ -3,6 +3,14 @@
 // Plain JS, not TS — service workers run outside your Next.js build, no
 // transpile step touches this file. Keep it dependency-free.
 
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
