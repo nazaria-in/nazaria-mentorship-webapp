@@ -10,6 +10,7 @@ import type { UserRole } from "@/types/users";
 import { createPendingExitSurveys } from "@/lib/server/exit-survey-provisioning";
 import { notifyMeetingInvite, scheduleMeetingReminders } from "@/lib/notifications/meeting-notifications";
 import { scheduleExitSurveyReminders, scheduleExitSurveyOverdueReminder } from "@/lib/notifications/exit-survey-notifications";
+import { triggerDispatch } from "@/lib/push/trigger-dispatch";
 
 interface CreateMeetingRequestBody {
   title: string;
@@ -192,9 +193,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // ── Reminder cascade for the creator ──────────────────────────────────
-  // The creator is already accepted (no invite needed) but still needs the
-  // time-based reminders (1h before, 1d before, meeting_started). They are
-  // excluded from participantIds above, so we schedule for them separately.
   try {
     await scheduleMeetingReminders(admin, meetingForNotifications, authUser.id);
   } catch (creatorReminderError) {
@@ -203,6 +201,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       creatorId: authUser.id,
     });
   }
+
+  // ── Trigger immediate push dispatch for the invite notifications ───────
+  // Reminders are scheduled for the future so the cron handles those fine.
+  // Only the invite notification (scheduled_for = now) benefits from
+  // immediate dispatch — participants should get it within seconds, not
+  // up to 5 minutes later.
+  after(async () => {
+    await triggerDispatch();
+  });
 
   // ── Exit survey provisioning ───────────────────────────────────────────
   let exitSurveyWarnings: string[] = [];

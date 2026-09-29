@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { notifyNewMessage } from "@/lib/notifications/message-notifications";
+import { triggerDispatch } from "@/lib/push/trigger-dispatch";
 import type {
   Conversation,
   ConversationOversight,
@@ -76,11 +77,6 @@ export async function fetchMessages(conversationId: string, cursor?: string): Pr
   const { data, error } = await query;
   if (error) throw error;
 
-  // Redaction fallback: fetchMessages hits the base table (RLS grants row
-  // access to any active participant, including for deleted rows, since
-  // RLS is row-level not column-level). Redact body here until/unless a
-  // dedicated non-oversight message view exists server-side. Oversight
-  // callers should use fetchMessagesForOversight() instead, which skips this.
   return ((data ?? []) as Message[])
     .reverse()
     .map((m) => (m.deleted_at ? { ...m, body: "" } : m));
@@ -197,6 +193,11 @@ export async function sendMessage(input: SendMessageInput): Promise<Message> {
       senderName: (senderProfile?.full_name as string | null)?.trim() || "Someone",
       body: input.body,
     });
+
+    // Trigger immediate push dispatch — message notifications are always
+    // scheduled_for now, so the cron's 5-minute delay is too slow for chat.
+    // Fire-and-forget: if this fails the cron still catches it.
+    void triggerDispatch();
   } catch (notificationError) {
     console.error("[messages] Failed to notify participants of new message", notificationError, {
       messageId: message.id,
@@ -358,11 +359,6 @@ export async function updateParticipantPermission(
   if (error) throw error;
 }
 
-/**
- * Atomic staff join. Wraps the enter_conversation_and_send() RPC — with no
- * body, this just adds the participant row. Use sendMessageAsNewStaffParticipant
- * when the join is triggered by a first send instead.
- */
 export async function enterConversationAsStaff(conversationId: string): Promise<void> {
   const { error } = await supabase.rpc("enter_conversation_and_send", {
     p_conversation_id: conversationId,
@@ -372,7 +368,6 @@ export async function enterConversationAsStaff(conversationId: string): Promise<
   if (error) throw error;
 }
 
-/** Atomic join-and-send in one transaction — see migration §8. */
 export async function sendMessageAsNewStaffParticipant(
   conversationId: string,
   body: string,
@@ -458,7 +453,6 @@ interface ComposerStateInput {
 
 export function getComposerDisabledState(input: ComposerStateInput): ComposerDisabledState {
   if (input.isStaff && !input.isActiveParticipant) {
-    // Replaced by the join-by-sending composer state in the UI — no static reason needed.
     return { disabled: false, reason: null };
   }
   if (input.leftAt) {
