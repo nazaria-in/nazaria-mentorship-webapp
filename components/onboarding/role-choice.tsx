@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, startTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GraduationCap, Loader2, ShieldCheck, Users } from "lucide-react";
+import posthog from "posthog-js";
 
 import { setUserRole } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
@@ -49,6 +50,7 @@ export function RoleChoice({ disabled = false }: RoleChoiceProps) {
     setError(null);
     try {
       await setUserRole(uid, role);
+      posthog.capture("onboarding_role_selected", { role });
       setRole(role);
       router.push(
         ROLES_REQUIRING_APPROVAL.includes(role)

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { updateUserProfile } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
 
@@ -42,6 +43,7 @@ export function ProfileForm() {
         interests: splitList(interestsInput),
         schoolOrOrg: schoolOrOrg.trim(),
       });
+      posthog.capture("onboarding_profile_completed", { role });
       router.push(role === "mentor" ? "/pending-approval" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save your profile. Try again.");

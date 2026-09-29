@@ -1,6 +1,9 @@
 // /lib/google/gemini.ts
 
+import { randomUUID } from "node:crypto";
 import { GoogleGenAI, Type } from "@google/genai";
+import { PostHogGoogleGenAI } from "@posthog/ai/gemini";
+import { PostHog } from "posthog-node";
 import { EXIT_SURVEY_CONCERN_TAGS, type ExitSurveyAiAnalysis } from "@/types/exit-survey";
 
 // Model name is env-configurable on purpose — Gemini model names shift
@@ -8,9 +11,10 @@ import { EXIT_SURVEY_CONCERN_TAGS, type ExitSurveyAiAnalysis } from "@/types/exi
 // current recommended flash model before relying on this default.
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
 
-let cachedClient: GoogleGenAI | null = null;
+let cachedClient: PostHogGoogleGenAI | null = null;
+let posthogClient: PostHog | null = null;
 
-function getGeminiClient(): GoogleGenAI {
+function getGeminiClient(): PostHogGoogleGenAI {
   if (cachedClient) return cachedClient;
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -18,7 +22,29 @@ function getGeminiClient(): GoogleGenAI {
     throw new Error("GEMINI_API_KEY is not set.");
   }
 
-  cachedClient = new GoogleGenAI({ apiKey });
+  const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+  if (!projectToken || !host) {
+    if (process.env.NODE_ENV === "development") {
+      const missingVariable = projectToken
+        ? "NEXT_PUBLIC_POSTHOG_HOST"
+        : "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN";
+      throw new Error(
+        `${missingVariable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${missingVariable} is configured`
+      );
+    }
+    cachedClient = new GoogleGenAI({ apiKey }) as unknown as PostHogGoogleGenAI;
+    return cachedClient;
+  }
+
+  posthogClient = new PostHog(projectToken, {
+    host,
+    privacyMode: false,
+    enableExceptionAutocapture: true,
+    flushAt: 1,
+    flushInterval: 0,
+  });
+  cachedClient = new PostHogGoogleGenAI({ apiKey, posthog: posthogClient });
   return cachedClient;
 }
 
@@ -87,7 +113,9 @@ const ANALYSIS_RESPONSE_SCHEMA = {
 export async function analyzeExitSurveyAudio(
   audioBuffer: Buffer,
   mimeType: string,
-  answersJson: string
+  answersJson: string,
+  exitSurveyId: string,
+  distinctId?: string
 ): Promise<ExitSurveyAiAnalysis> {
   const client = getGeminiClient();
 
@@ -131,7 +159,13 @@ export async function analyzeExitSurveyAudio(
         responseMimeType: "application/json",
         responseSchema: ANALYSIS_RESPONSE_SCHEMA,
       },
+      posthogTraceId: randomUUID(),
+      posthogProperties: {
+        $ai_session_id: exitSurveyId,
+      },
+      ...(distinctId ? { posthogDistinctId: distinctId } : {}),
     });
+    await posthogClient?.flush();
   } catch (sdkError) {
     console.error("[gemini] generateContent threw:", JSON.stringify(sdkError, null, 2));
     console.error("[gemini] generateContent threw (raw):", sdkError);

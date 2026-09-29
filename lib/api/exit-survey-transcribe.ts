@@ -21,11 +21,13 @@ export class TranscribeError extends Error {
  */
 export async function transcribeAudio(
   audioBlob: Blob,
-  answersSoFar: ExitSurveyEntry[]
+  answersSoFar: ExitSurveyEntry[],
+  exitSurveyId: string
 ): Promise<ExitSurveyAiAnalysis> {
   const formData = new FormData();
   formData.append("audio", audioBlob, "exit-survey-note.webm");
   formData.append("answers", JSON.stringify(answersSoFar));
+  formData.append("exitSurveyId", exitSurveyId);
 
   const response = await fetch("/api/exit-survey/transcribe", {
     method: "POST",

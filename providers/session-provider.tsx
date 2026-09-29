@@ -3,6 +3,8 @@
 "use client";
 
 import * as React from "react";
+import posthog from "posthog-js";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useSessionStore } from "@/store/session-store";
 import type { Role } from "@/providers/role-provider";
@@ -13,12 +15,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     const supabase = createClient();
+    let identifiedUserId: string | null = null;
 
-    async function hydrateFromUserId(userId: string) {
+    function identifyUser(user: User) {
+      if (identifiedUserId && identifiedUserId !== user.id) {
+        posthog.reset();
+      }
+
+      posthog.identify(user.id, {
+        email: user.email,
+        name:
+          typeof user.user_metadata.full_name === "string"
+            ? user.user_metadata.full_name
+            : undefined,
+      });
+      identifiedUserId = user.id;
+    }
+
+    async function hydrateFromUser(user: User) {
+      identifyUser(user);
+
       const { data: profile } = await supabase
         .from("users")
         .select("id, role, full_name, approval_status")
-        .eq("id", userId)
+        .eq("id", user.id)
         .single();
 
       if (profile) {
@@ -33,23 +53,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Initial load
+    // Identify the persisted session once on page refresh.
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
-        hydrateFromUserId(data.user.id);
+        void hydrateFromUser(data.user);
       } else {
         clearSession();
       }
     });
 
-    // Re-hydrate whenever auth state actually changes
-    // (sign in, sign up, sign out, token refresh)
+    // Identify after sign-in/sign-up and reset when that session ends.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        hydrateFromUserId(session.user.id);
+      if (session?.user && event === "SIGNED_IN") {
+        void hydrateFromUser(session.user);
       } else if (event === "SIGNED_OUT") {
+        posthog.reset();
+        identifiedUserId = null;
         clearSession();
       }
     });

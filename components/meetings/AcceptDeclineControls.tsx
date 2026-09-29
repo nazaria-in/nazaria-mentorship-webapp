@@ -4,6 +4,7 @@
 
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import posthog from "posthog-js";
 import { updateParticipantStatus } from "@/lib/api/meetings";
 import type { MeetingWithParticipants } from "@/types/meetings";
 
@@ -32,7 +33,8 @@ export function AcceptDeclineControls({
       if (!participant) throw new Error("No participant record for this user on this meeting");
       return updateParticipantStatus(participant.id, status);
     },
-    onSuccess: () => {
+    onSuccess: (_data, status) => {
+      posthog.capture("meeting_invitation_responded", { response: status });
       invalidateQueryKeys.forEach((key) => {
         void queryClient.invalidateQueries({ queryKey: key });
       });

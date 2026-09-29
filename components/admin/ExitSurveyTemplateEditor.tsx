@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchTemplatesForRole,
@@ -96,6 +97,7 @@ export function ExitSurveyTemplateEditor({ currentUserId }: ExitSurveyTemplateEd
       setNewTitle("");
       setIsCreating(false);
       setWorking(toWorkingTemplate(created)); // ← open it immediately, don't wait on refetch
+      posthog.capture("exit_survey_template_created", { role });
       refreshList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create template.");
@@ -166,6 +168,10 @@ export function ExitSurveyTemplateEditor({ currentUserId }: ExitSurveyTemplateEd
         voicePromptLabel: working.voicePromptLabel.trim() || null,
       });
       setWorking(toWorkingTemplate(saved)); // reflect exactly what the DB now has
+      posthog.capture("exit_survey_template_updated", {
+        role: saved.role,
+        question_count: saved.questions.length,
+      });
       setSaveState("saved");
       refreshList();
     } catch (err) {
@@ -179,6 +185,7 @@ export function ExitSurveyTemplateEditor({ currentUserId }: ExitSurveyTemplateEd
     setError(null);
     try {
       await activateTemplate(working.id, working.role);
+      posthog.capture("exit_survey_template_activated", { role: working.role });
       updateWorking({ isActive: true });
       refreshList();
     } catch (err) {

@@ -8,6 +8,7 @@ import { SessionProvider } from "@/providers/session-provider";
 import { RoleProvider } from "@/providers/role-provider";
 import { ConditionalShell } from "@/components/shell/ConditionalShell";
 import { ServiceWorkerRegistrar } from "@/components/shell/ServiceWorkerRegistrar";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 
 export const metadata: Metadata = {
   title: "Nazaria",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           still handled correctly.
         */}
         <ServiceWorkerRegistrar />
+        <PostHogProvider>
         <ThemeProvider>
           <QueryProvider>
             <SessionProvider>
@@ -39,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SessionProvider>
           </QueryProvider>
         </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

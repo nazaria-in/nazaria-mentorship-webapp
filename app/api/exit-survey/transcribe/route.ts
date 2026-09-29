@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeExitSurveyAudio } from "@/lib/google/gemini";
+import { createClient } from "@/lib/supabase/server";
 
 // We never write the audio to storage or disk — it's read into memory,
 // sent to Gemini, and discarded when this request finishes.
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const formData = await request.formData();
   const audioFile = formData.get("audio");
   const answersJson = formData.get("answers");
+  const exitSurveyId = formData.get("exitSurveyId");
 
   if (!(audioFile instanceof Blob)) {
     console.error("[transcribe route] missing audio file in form data");
@@ -18,6 +20,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error("[transcribe route] missing answers field in form data");
     return NextResponse.json({ error: "Missing answers." }, { status: 400 });
   }
+  if (typeof exitSurveyId !== "string") {
+    console.error("[transcribe route] missing exit survey ID in form data");
+    return NextResponse.json({ error: "Missing exit survey ID." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
 
   console.log("[transcribe route] request received", {
     audioType: audioFile.type,
@@ -30,7 +41,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const audioBuffer = Buffer.from(arrayBuffer);
     const mimeType = audioFile.type || "audio/webm";
 
-    const analysis = await analyzeExitSurveyAudio(audioBuffer, mimeType, answersJson);
+    const analysis = await analyzeExitSurveyAudio(
+      audioBuffer,
+      mimeType,
+      answersJson,
+      exitSurveyId,
+      authUser?.id
+    );
 
     console.log("[transcribe route] success", {
       transcriptLength: analysis.transcript.length,

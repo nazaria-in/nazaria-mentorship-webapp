@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserProfile } from "@/lib/api/auth";
 import { useSessionStore } from "@/store/session-store";
@@ -104,6 +105,7 @@ export function ProfileEditForm() {
         interests: splitList(interestsInput),
         schoolOrOrg: schoolOrOrg.trim(),
       });
+      posthog.capture("profile_updated");
       setFullName(fullName.trim());
       setSavedAt(Date.now());
     } catch (err) {

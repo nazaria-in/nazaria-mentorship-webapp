@@ -5,6 +5,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
+import posthog from "posthog-js";
 import { Modal } from "@/components/shared/Modal";
 import type { UserCardPerson } from "@/components/shared/UserCard";
 import { fetchInviteCandidates } from "@/lib/api/meetings";
@@ -225,7 +226,11 @@ function MeetingFormFields({
 
   const mutation = useMutation({
     mutationFn: createMeetingRequest,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      posthog.capture("meeting_scheduled", {
+        participant_count: variables.participantUserIds.length,
+        has_description: Boolean(variables.description),
+      });
       void queryClient.invalidateQueries({ queryKey: ["meetings"] });
       onClose();
     },

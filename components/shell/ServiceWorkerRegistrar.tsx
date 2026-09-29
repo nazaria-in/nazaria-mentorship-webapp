@@ -3,29 +3,66 @@
 "use client";
 
 import { useEffect } from "react";
+import posthog from "posthog-js";
 
-// Registers /public/sw.js once at the root layout level. Rendered as a
-// child of the root layout body — it produces no DOM output. Must be a
-// separate "use client" component because app/layout.tsx is a Server
-// Component and cannot call useEffect directly.
-//
-// Registration is intentionally silent on failure — if the browser doesn't
-// support service workers (very old browsers, some private browsing modes)
-// the app continues to work normally; push notifications simply won't be
-// available, and PushNotificationToggle handles that case by hiding itself.
+// Registers /public/sw.js once at the root layout level.
+// Also listens for SW_LOG messages that sw.js broadcasts via postMessage
+// and forwards them to PostHog, since PostHog cannot run inside a SW directly.
+
+interface SwLogMessage {
+  type: "SW_LOG";
+  event: string;
+  properties: Record<string, unknown>;
+}
+
+function isSwLogMessage(data: unknown): data is SwLogMessage {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as Record<string, unknown>)["type"] === "SW_LOG"
+  );
+}
+
 export function ServiceWorkerRegistrar(): null {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
 
+    // Register the SW
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
-        console.log("[sw] registered, scope:", registration.scope);
+        posthog.capture("sw_registered", {
+          scope: registration.scope,
+          state: registration.active
+            ? "active"
+            : registration.waiting
+            ? "waiting"
+            : registration.installing
+            ? "installing"
+            : "unknown",
+        });
       })
-      .catch((err) => {
-        console.warn("[sw] registration failed:", err);
+      .catch((err: unknown) => {
+        posthog.capture("sw_registration_failed", {
+          error: String(err),
+        });
       });
+
+    // Forward SW postMessage logs to PostHog
+    function handleMessage(event: MessageEvent): void {
+      if (!isSwLogMessage(event.data)) return;
+      posthog.capture(event.data.event, {
+        ...event.data.properties,
+        source: "service_worker",
+      });
+    }
+
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
   }, []);
 
   return null;

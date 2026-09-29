@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Send, Smile, X } from "lucide-react";
+import posthog from "posthog-js";
 import { EmojiPicker } from "./EmojiPicker";
 import type { Message } from "@/types/messages";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ export function MessageComposer({ disabled, disabledReason, replyingTo, onCancel
     setSending(true);
     try {
       await onSend(trimmed);
+      posthog.capture("message_sent", { is_reply: replyingTo !== null });
       setBody("");
     } finally {
       setSending(false);

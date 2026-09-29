@@ -1,6 +1,8 @@
 // /app/api/meetings/route.ts
 
-import { NextRequest, NextResponse } from "next/server";
+import { SeverityNumber } from "@opentelemetry/api-logs";
+import { after, NextRequest, NextResponse } from "next/server";
+import { posthogLogProvider } from "@/instrumentation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createCalendarEvent } from "@/lib/google/calendar-events";
@@ -246,6 +248,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (exitSurveyError) {
     console.error("[meetings] Failed to create pending exit surveys", exitSurveyError, { meetingId });
     exitSurveyWarnings = ["Exit surveys could not be created for this meeting — see server logs."];
+  }
+
+  const logProvider = posthogLogProvider;
+  const meetingLog = logProvider?.getLogger("posthog-meeting-creation");
+  meetingLog?.emit({
+    body: "meeting creation completed",
+    severityNumber: SeverityNumber.INFO,
+    attributes: {
+      event: "meeting_creation_completed",
+      creator_role: creatorRole,
+      invited_participant_count: participantIds.length,
+      calendar_event_created: Boolean(googleEventId),
+      exit_survey_warning_count: exitSurveyWarnings.length,
+    },
+  });
+
+  if (logProvider) {
+    after(async () => {
+      await logProvider.forceFlush();
+    });
   }
 
   return NextResponse.json({ meeting, exitSurveyWarnings }, { status: 201 });

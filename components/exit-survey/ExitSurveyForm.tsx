@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { transcribeAudio, isTranscribeServiceBusy } from "@/lib/api/exit-survey-transcribe";
 import type {
@@ -119,7 +120,7 @@ export function ExitSurveyForm({
     setIsTranscribing(true);
 
     try {
-      const result = await transcribeAudio(recorder.audioBlob, buildAnswersPayload());
+      const result = await transcribeAudio(recorder.audioBlob, buildAnswersPayload(), exitSurveyId);
       setTranscript(result.transcript);
       setAiHeadline(result.headline);
       setAiSummary(result.summary);
@@ -191,6 +192,12 @@ export function ExitSurveyForm({
         concernTags: concernTags.length > 0 ? concernTags : undefined,
         needsFollowUp: needsFollowUp || undefined,
         followUpUrgency: followUpUrgency !== "none" ? followUpUrgency : undefined,
+      });
+      posthog.capture("exit_survey_submitted", {
+        role,
+        signal,
+        question_count: visibleEntries.length,
+        has_transcript: transcript.trim().length > 0,
       });
 
       // Cleanup (replacing finally block due to React Compiler limitations)
