@@ -14,7 +14,8 @@ import { useRole } from "@/providers/role-provider";
 import { useSessionStore } from "@/store/session-store";
 import type { FilterFieldDef } from "@/lib/filtering/types";
 import type { UserRole } from "@/types/users";
-import type { ConversationKind } from "@/types/messages";
+import type { BroadcastAudience, ConversationKind } from "@/types/messages";
+import { isBroadcastAudience } from "@/types/messages";
 import { cn } from "@/lib/utils";
 
 interface NewConversationModalProps {
@@ -28,18 +29,36 @@ const EMPTY_FIELD_DEFS: FilterFieldDef[] = [
 
 const STAFF_SELECTABLE_ROLES: UserRole[] = ["mentor", "mentee", "associate", "pm"];
 
+const AUDIENCE_OPTIONS: { value: BroadcastAudience; label: string }[] = [
+  { value: "mentees", label: "Mentees" },
+  { value: "mentors", label: "Mentors" },
+  { value: "everyone", label: "Everyone" },
+];
+
+const MENTOR_KIND_OPTIONS: { value: ConversationKind; label: string }[] = [
+  { value: "pod", label: "Team" },
+];
+
+const STAFF_KIND_OPTIONS: { value: ConversationKind; label: string }[] = [
+  { value: "group", label: "Group" },
+  { value: "direct", label: "Direct message" },
+  { value: "pod", label: "Team" },
+  { value: "broadcast", label: "Broadcast" },
+];
+
 export function NewConversationModal({ isOpen, onClose }: NewConversationModalProps) {
   const router = useRouter();
   const { role } = useRole();
   const currentUser = useSessionStore((state) => state.userId);
   const isStaff = role === "pm" || role === "associate";
   const isMentor = role === "mentor";
+  const defaultKind: ConversationKind = isMentor ? "pod" : "group";
 
   // Mentor can only ever create 'pod' conversations. Staff choose freely.
-  const [kind, setKind] = useState<ConversationKind>(isMentor ? "team" : "group");
+  const [kind, setKind] = useState<ConversationKind>(defaultKind);
   const [selectedPodId, setSelectedPodId] = useState<string | null>(null);
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
-  const [audience, setAudience] = useState<string>("");
+  const [audience, setAudience] = useState<BroadcastAudience | "">("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [readOnlyIds, setReadOnlyIds] = useState<Set<string>>(new Set());
   const [name, setName] = useState("");
@@ -60,24 +79,30 @@ export function NewConversationModal({ isOpen, onClose }: NewConversationModalPr
     enabled: isStaff && kind === "broadcast",
   });
 
-const mentorMentees: SelectablePerson[] = useMemo(() => {
-  if (!selectedPodId || !mentorPodGroups) return [];
-  const pod = mentorPodGroups.find((p) => p.id === selectedPodId);
-  if (!pod) return [];
-  return pod.members.map((m) => ({
-    id: m.id,
-    fullName: m.full_name,
-    role: "mentee" as const,
-    approvalStatus: "approved" as const,
-    podName: pod.name,
-    podId: pod.id,
-    cohortId: pod.cohortId ?? null,      // add
-    cohortName: pod.cohortName ?? null,  // add
-  }));
-}, [selectedPodId, mentorPodGroups]);
+  const mentorMentees: SelectablePerson[] = useMemo(() => {
+    if (!selectedPodId || !mentorPodGroups) return [];
+    const pod = mentorPodGroups.find((p) => p.id === selectedPodId);
+    if (!pod) return [];
+    return pod.members.map((m) => ({
+      id: m.id,
+      fullName: m.full_name,
+      role: "mentee" as const,
+      approvalStatus: "approved" as const,
+      podName: pod.name,
+      podId: pod.id,
+      cohortId: pod.cohortId ?? null,
+      cohortName: pod.cohortName ?? null,
+    }));
+  }, [selectedPodId, mentorPodGroups]);
 
-  const podLocked = isMentor && kind === "team" && !selectedPodId;
   const isBroadcast = kind === "broadcast";
+  const podLocked = isMentor && kind === "pod" && !selectedPodId;
+  const kindOptions = isMentor ? MENTOR_KIND_OPTIONS : STAFF_KIND_OPTIONS;
+
+  // Derived during render — no effect/state needed.
+  const canSubmit = isBroadcast
+    ? name.trim() !== "" && selectedCohortId !== null && audience !== ""
+    : name.trim() !== "" && selectedIds.length > 0;
 
   function displayNameFor(id: string): string {
     if (isMentor) {
@@ -87,7 +112,7 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
   }
 
   function resetAndClose() {
-    setKind(isMentor ? "team" : "group");
+    setKind(defaultKind);
     setSelectedPodId(null);
     setSelectedCohortId(null);
     setAudience("");
@@ -110,11 +135,7 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
   }
 
   async function handleCreate() {
-    if (isBroadcast) {
-      if (!name.trim() || !selectedCohortId || !audience) return;
-    } else if (selectedIds.length === 0 || !name.trim()) {
-      return;
-    }
+    if (!canSubmit) return;
 
     setSubmitting(true);
     setError(null);
@@ -123,9 +144,9 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
         name: name.trim(),
         description: description.trim() || undefined,
         kind,
-        podId: kind === "team" ? selectedPodId ?? undefined : undefined,
+        podId: kind === "pod" ? selectedPodId ?? undefined : undefined,
         cohortId: isBroadcast ? selectedCohortId ?? undefined : undefined,
-        audience: isBroadcast ? audience : undefined,
+        audience: isBroadcast && audience !== "" ? audience : undefined,
         participants: isBroadcast
           ? [] // broadcast recipients are provisioned separately (cohort/audience-driven), not picked here
           : selectedIds.map((userId) => ({ userId, canMessage: !readOnlyIds.has(userId) })),
@@ -135,21 +156,14 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
     } catch (err) {
       console.error("[NewConversationModal] create failed:", err);
       const message =
-        err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Couldn't create conversation.";
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Couldn't create conversation.";
       setError(message);
     } finally {
       setSubmitting(false);
     }
   }
-
-  const kindOptions: { value: ConversationKind; label: string }[] = isMentor
-    ? [{ value: "team", label: "Team" }]
-    : [
-        { value: "group", label: "Group" },
-        { value: "direct", label: "Direct message" },
-        { value: "team", label: "Team" },
-        { value: "broadcast", label: "Broadcast" },
-      ];
 
   return (
     <Modal open={isOpen} onClose={resetAndClose} title="New conversation">
@@ -169,7 +183,7 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
                   className={cn(
                     "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
                     kind === opt.value
-                      ? "bg-primary text-primary-foreground border-primary dark:bg-primary dark:text-primary-foreground"
+                      ? "bg-primary text-primary-foreground border-primary dark:bg-primary dark:text-primary-foreground dark:border-primary"
                       : "bg-surface text-text-muted dark:bg-surface dark:text-text-muted border-border-strong dark:border-border-strong"
                   )}
                 >
@@ -188,12 +202,12 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. team 3 check-in"
-              className="mt-1 w-full rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary outline-none focus:border-primary"
+              className="mt-1 w-full rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary outline-none focus:border-primary dark:focus:border-primary"
             />
           </div>
         )}
 
-        {(kind === "team" || kind === "group") && (
+        {(kind === "pod" || kind === "group") && (
           <div>
             <label className="text-sm font-medium text-text-primary dark:text-text-primary">
               Description <span className="text-text-muted dark:text-text-muted font-normal">(optional)</span>
@@ -203,12 +217,12 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this conversation for?"
               rows={2}
-              className="mt-1 w-full resize-none rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary outline-none focus:border-primary"
+              className="mt-1 w-full resize-none rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary outline-none focus:border-primary dark:focus:border-primary"
             />
           </div>
         )}
 
-        {isMentor && kind === "team" && (
+        {isMentor && kind === "pod" && (
           <div>
             <label className="text-sm font-medium text-text-primary dark:text-text-primary">Team</label>
             <p className="text-xs text-text-muted dark:text-text-muted mb-1">
@@ -255,13 +269,18 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
               <label className="text-sm font-medium text-text-primary dark:text-text-primary">Audience</label>
               <select
                 value={audience}
-                onChange={(e) => setAudience(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setAudience(isBroadcastAudience(next) ? next : "");
+                }}
                 className="mt-1 w-full rounded-lg border border-border-strong dark:border-border-strong bg-surface dark:bg-surface px-3 py-2 text-sm text-text-primary dark:text-text-primary"
               >
                 <option value="">Select…</option>
-                <option value="mentees">Mentees</option>
-                <option value="mentors">Mentors</option>
-                <option value="all">Everyone</option>
+                {AUDIENCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -287,7 +306,9 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
                 viewKey="new-conversation-picker-staff"
                 queryKey={["new-conversation-picker", "staff"]}
                 queryFn={async () => {
-                  const results = await Promise.all(STAFF_SELECTABLE_ROLES.map((r) => fetchSelectablePeople({ role: r })));
+                  const results = await Promise.all(
+                    STAFF_SELECTABLE_ROLES.map((r) => fetchSelectablePeople({ role: r }))
+                  );
                   const flattened = results.flat();
                   setStaffNameById(new Map(flattened.map((p) => [p.id, p.fullName ?? "Unnamed"] as const)));
                   return flattened;
@@ -316,7 +337,7 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
                     type="checkbox"
                     checked={!readOnlyIds.has(id)}
                     onChange={() => toggleReadOnly(id)}
-                    className="h-3.5 w-3.5 accent-primary"
+                    className="h-3.5 w-3.5 accent-primary dark:accent-primary"
                   />
                   Can send messages — {displayNameFor(id)}
                 </label>
@@ -330,8 +351,8 @@ const mentorMentees: SelectablePerson[] = useMemo(() => {
         <button
           type="button"
           onClick={() => void handleCreate()}
-          disabled={submitting || (isBroadcast ? !name.trim() || !selectedCohortId || !audience : selectedIds.length === 0 || !name.trim())}
-          className="rounded-lg px-4 py-2 text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled={submitting || !canSubmit}
+          className="rounded-lg px-4 py-2 text-sm font-medium bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? "Creating…" : "Create conversation"}
         </button>

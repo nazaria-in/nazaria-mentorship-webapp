@@ -1,8 +1,22 @@
 // /types/messages.ts
 
-export type ConversationKind = "direct" | "team" | "group" | "broadcast";
+/** Mirrors the DB enum `conversation_kind`. */
+export const CONVERSATION_KINDS = ["direct", "pod", "broadcast", "group"] as const;
 
-export type BroadcastAudience = string;
+export type ConversationKind = (typeof CONVERSATION_KINDS)[number];
+
+/** Mirrors the DB enum `broadcast_audience`. */
+export const BROADCAST_AUDIENCES = ["everyone", "mentors", "mentees"] as const;
+
+export type BroadcastAudience = (typeof BROADCAST_AUDIENCES)[number];
+
+export function isBroadcastAudience(value: string): value is BroadcastAudience {
+  return (BROADCAST_AUDIENCES as readonly string[]).includes(value);
+}
+
+export function isConversationKind(value: string): value is ConversationKind {
+  return (CONVERSATION_KINDS as readonly string[]).includes(value);
+}
 
 export interface Conversation {
   id: string;
@@ -90,6 +104,7 @@ export interface PendingMessage extends Message {
   status: PendingMessageStatus;
 }
 
+/** UI-only filter; "teams" maps to the DB kind "pod". */
 export type ConversationListFilter = "all" | "unread" | "teams" | "groups" | "broadcasts" | "direct";
 
 export interface ComposerDisabledState {

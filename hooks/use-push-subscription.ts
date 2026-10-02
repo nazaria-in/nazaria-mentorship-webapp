@@ -2,6 +2,8 @@
 
 "use client";
 
+console.log("[push:hook] mounted, posthog ready:", posthog.__loaded);
+
 import { useEffect, useState } from "react";
 import posthog from "posthog-js";
 
