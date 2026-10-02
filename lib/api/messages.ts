@@ -11,6 +11,7 @@ import type {
   ComposerDisabledState,
   Message,
   CreateConversationInput,
+  ConversationKind,
 } from "@/types/messages";
 
 const supabase = createClient();
@@ -116,7 +117,7 @@ export async function searchConversationMessages(conversationId: string, queryTe
 // ============================================================
 
 interface ConversationForNotificationRow {
-  kind: "direct" | "pod" | "group" | "broadcast";
+  kind: ConversationKind;
   name: string | null;
 }
 
@@ -213,10 +214,11 @@ export async function forwardMessage(original: Message, targetConversationIds: s
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!userData.user) throw new Error("Not authenticated.");
+  const userId = userData.user.id;
 
   const rows = targetConversationIds.map((conversationId) => ({
     conversation_id: conversationId,
-    sender_id: userData.user!.id,
+    sender_id: userId,
     body: original.body,
     forwarded_from_message_id: original.id,
   }));
@@ -255,9 +257,10 @@ export async function createConversation(input: CreateConversationInput): Promis
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!userData.user) throw new Error("Not authenticated.");
+  const userId = userData.user.id;
 
-  if (input.kind === "team" && !input.podId) {
-    throw new Error("teamId is required for team conversations.");
+  if (input.kind === "pod" && !input.podId) {
+    throw new Error("podId is required for pod conversations.");
   }
   if (input.kind === "broadcast" && (!input.cohortId || !input.audience)) {
     throw new Error("cohortId and audience are required for broadcast conversations.");
@@ -268,10 +271,10 @@ export async function createConversation(input: CreateConversationInput): Promis
 
   const insertPayload = {
     kind: input.kind,
-    created_by: userData.user.id,
+    created_by: userId,
     name: input.name.trim() || null,
     description: input.description?.trim() || null,
-    pod_id: input.kind === "team" ? input.podId : null,
+    pod_id: input.kind === "pod" ? input.podId : null,
     cohort_id: input.kind === "broadcast" ? input.cohortId : null,
     audience: input.kind === "broadcast" ? input.audience : null,
   };
@@ -294,13 +297,13 @@ export async function createConversation(input: CreateConversationInput): Promis
   }
 
   const participantMap = new Map<string, boolean>(input.participants.map((p) => [p.userId, p.canMessage]));
-  participantMap.set(userData.user.id, true);
+  participantMap.set(userId, true);
 
-  const participantRows = Array.from(participantMap.entries()).map(([userId, canMessage]) => ({
+  const participantRows = Array.from(participantMap.entries()).map(([participantId, canMessage]) => ({
     conversation_id: conversation.id as string,
-    user_id: userId,
+    user_id: participantId,
     can_message: canMessage,
-    added_by: userId === userData.user!.id ? null : userData.user!.id,
+    added_by: participantId === userId ? null : userId,
   }));
 
   const { error: participantsError } = await supabase.from("conversation_participants").insert(participantRows);
@@ -417,7 +420,7 @@ export async function grantStaffAllBroadcastAccess(userId: string): Promise<void
 
 interface NameResolutionInput {
   name: string | null;
-  kind: "direct" | "team" | "group" | "broadcast";
+  kind: ConversationKind;
   otherParticipantNames: string[] | null;
 }
 
@@ -445,7 +448,7 @@ export function resolveConversationName(input: NameResolutionInput): string {
 
 interface ComposerStateInput {
   canMessage: boolean;
-  kind: "direct" | "team" | "group" | "broadcast";
+  kind: ConversationKind;
   leftAt: string | null;
   isStaff: boolean;
   isActiveParticipant: boolean;

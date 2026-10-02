@@ -5,7 +5,7 @@ import { Fragment, useMemo, useRef, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
-import type { ConversationParticipant, Message, PendingMessage } from "@/types/messages";
+import type { ConversationKind, ConversationParticipant, Message, PendingMessage } from "@/types/messages";
 
 interface ParticipantWithName extends ConversationParticipant {
   full_name: string | null;
@@ -18,7 +18,7 @@ interface MessageListProps {
   currentUserId: string;
   isStaffViewer: boolean;
   /** Direct 1:1s never need sender labels; anything with more than 2 people does. */
-  conversationKind: "direct" | "team" | "group" | "broadcast";
+  conversationKind: ConversationKind;
   /** last_read_at captured once on mount — the unread divider position must not shift as you read further. */
   initialLastReadAt: string | null;
   hasNextPage: boolean;
