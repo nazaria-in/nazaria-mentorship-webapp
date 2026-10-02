@@ -30,17 +30,17 @@ import type { UserCardPerson } from "@/components/shared/UserCard";
 type Crumb =
   | { level: "root" }
   | { level: "cohort"; id: string; name: string }
-  | { level: "team"; cohortId: string; cohortName: string; id: string; name: string };
+  | { level: "pod"; cohortId: string; cohortName: string; id: string; name: string };
 
 function Breadcrumbs({ crumb, onNavigate }: { crumb: Crumb; onNavigate: (c: Crumb) => void }) {
   const parts: { label: string; target: Crumb }[] = [{ label: "All cohorts", target: { level: "root" } }];
-  if (crumb.level === "cohort" || crumb.level === "team") {
+  if (crumb.level === "cohort" || crumb.level === "pod") {
     parts.push({
       label: crumb.level === "cohort" ? crumb.name : crumb.cohortName,
       target: crumb.level === "cohort" ? crumb : { level: "cohort", id: crumb.cohortId, name: crumb.cohortName },
     });
   }
-  if (crumb.level === "team") parts.push({ label: crumb.name, target: crumb });
+  if (crumb.level === "pod") parts.push({ label: crumb.name, target: crumb });
 
   return (
     <nav className="flex items-center gap-1.5 text-sm">
@@ -500,12 +500,12 @@ export function CohortsTab() {
         <PodList
           cohortId={crumb.id}
           onSelect={(pod) =>
-            setCrumb({ level: "team", cohortId: crumb.id, cohortName: crumb.name, id: pod.id, name: pod.name })
+            setCrumb({ level: "pod", cohortId: crumb.id, cohortName: crumb.name, id: pod.id, name: pod.name })
           }
         />
       )}
 
-      {crumb.level === "team" && (
+      {crumb.level === "pod" && (
         <PodRosterView podId={crumb.id} cohortName={crumb.cohortName} podName={crumb.name} />
       )}
     </div>

@@ -36,13 +36,13 @@ const AUDIENCE_OPTIONS: { value: BroadcastAudience; label: string }[] = [
 ];
 
 const MENTOR_KIND_OPTIONS: { value: ConversationKind; label: string }[] = [
-  { value: "pod", label: "Team" },
+  { value: "pod", label: "pod" },
 ];
 
 const STAFF_KIND_OPTIONS: { value: ConversationKind; label: string }[] = [
   { value: "group", label: "Group" },
   { value: "direct", label: "Direct message" },
-  { value: "pod", label: "Team" },
+  { value: "pod", label: "pod" },
   { value: "broadcast", label: "Broadcast" },
 ];
 

@@ -38,7 +38,7 @@ function matchesFilter(conversation: ConversationSummary, filter: ConversationLi
     case "unread":
       return conversation.unread_count > 0;
     case "teams":
-      return conversation.kind === "team";
+      return conversation.kind === "pod";
     case "groups":
       return conversation.kind === "group";
     case "broadcasts":
